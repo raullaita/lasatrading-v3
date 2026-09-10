@@ -5,3 +5,6 @@ psycopg2-binary
 pydantic
 redis
 python-dotenv
+pandas
+pyarrow
+httpx

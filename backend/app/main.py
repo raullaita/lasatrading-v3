@@ -1,9 +1,23 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routers import data, watchlist
+from app.core.models import Base
+from app.infra.db import engine
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
+
 
 app = FastAPI(
     title="LasaTrading API",
     version="3.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -13,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(data.router)
+app.include_router(watchlist.router)
 
 
 @app.get("/api/v1/health")
