@@ -1,4 +1,9 @@
 import type { MarketDataFile, WatchlistItem } from "@/types/data";
+import type {
+  BacktestQueued,
+  BacktestRequest,
+  BacktestTaskResult,
+} from "@/types/backtest";
 import type { StrategyCatalogItem } from "@/types/strategies";
 
 export const API_BASE_URL =
@@ -50,4 +55,15 @@ export function getStrategiesCatalog(): Promise<StrategyCatalogItem[]> {
 
 export function getStrategyDetail(name: string): Promise<StrategyCatalogItem> {
   return request<StrategyCatalogItem>(`/api/v1/strategies/catalog/${name}`);
+}
+
+export function runBacktest(payload: BacktestRequest): Promise<BacktestQueued> {
+  return request<BacktestQueued>("/api/v1/backtest/run", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getBacktestResults(taskId: string): Promise<BacktestTaskResult> {
+  return request<BacktestTaskResult>(`/api/v1/backtest/results/${taskId}`);
 }

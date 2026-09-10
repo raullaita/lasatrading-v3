@@ -22,6 +22,13 @@ def read_candles(file_path: str) -> pd.DataFrame:
     return df
 
 
+def load_parquet(file_path: str) -> pd.DataFrame:
+    df = read_candles(file_path)
+    if "timestamp" in df.columns:
+        df = df.sort_values("timestamp")
+    return df.reset_index(drop=True)
+
+
 def get_parquet_metadata(file_path: str) -> Dict | None:
     if not os.path.exists(file_path):
         return None
