@@ -6,5 +6,6 @@ pydantic
 redis
 python-dotenv
 pandas
+numpy
 pyarrow
 httpx

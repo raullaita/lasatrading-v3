@@ -3,8 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import data, watchlist
+from app.api.routers import data, strategies, watchlist
 from app.core.models import Base
+from app.core.strategies.registry import registry
 from app.infra.db import engine
 
 
@@ -30,6 +31,7 @@ app.add_middleware(
 
 app.include_router(data.router)
 app.include_router(watchlist.router)
+app.include_router(strategies.router)
 
 
 @app.get("/api/v1/health")

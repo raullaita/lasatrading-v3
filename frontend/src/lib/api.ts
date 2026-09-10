@@ -1,4 +1,5 @@
 import type { MarketDataFile, WatchlistItem } from "@/types/data";
+import type { StrategyCatalogItem } from "@/types/strategies";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -41,4 +42,12 @@ export function addToWatchlist(symbol: string): Promise<void> {
     method: "POST",
     body: JSON.stringify({ symbol }),
   });
+}
+
+export function getStrategiesCatalog(): Promise<StrategyCatalogItem[]> {
+  return request<StrategyCatalogItem[]>("/api/v1/strategies/catalog");
+}
+
+export function getStrategyDetail(name: string): Promise<StrategyCatalogItem> {
+  return request<StrategyCatalogItem>(`/api/v1/strategies/catalog/${name}`);
 }
