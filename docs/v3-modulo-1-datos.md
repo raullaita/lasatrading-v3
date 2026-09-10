@@ -134,7 +134,7 @@ Se usará para gestionar los símbolos favoritos del usuario, permitiendo filtra
 6.  El modal cambia a la vista de **Progreso**. El usuario ve cómo se descargan las velas en tiempo real.
 7.  El usuario cierra el modal para seguir trabajando. La tarea sigue en segundo plano.
 8.  Al terminar, la tabla principal se refresca automáticamente y los 3 archivos pasan a estado verde (🟢 Actualizado).
-9.  En segundo plano, el **Data Updater** tomará el relevo cada 5 minutos para mantenerlos frescos sin intervención del usuario.
+9.  En segundo plano, el **Data Updater** tomará el relevo cada 1-5 minutos según el timeframe para mantenerlos frescos sin intervención del usuario.
 
 ---
 
@@ -192,7 +192,7 @@ En la **Pantalla 1 (Dashboard de Datos)**, en la sección expandida de cada arch
 ## 8. Criterios de Aceptación (Definition of Done)
 - [ ] La tabla `market_data_files` se crea y se pobla correctamente.
 - [ ] La descarga histórica desde Binance genera archivos Parquet válidos y sin duplicados.
-- [ ] El Data Updater actualiza automáticamente los archivos desactualizados cada 5 minutos.
+- [ ] El Data Updater actualiza automáticamente los archivos desactualizados según la cadencia definida (1-5 min).
 - [ ] La UI muestra el estado de frescura (🟢/🔴) correctamente.
 - [ ] El modal de importación permite timeframes personalizados y muestra el progreso en tiempo real.
 - [ ] Las tareas en segundo plano pueden minimizarse y reabrirse desde la Topbar o la pantalla principal.

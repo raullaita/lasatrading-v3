@@ -104,7 +104,7 @@ El Monitor NO debe esperar al Data Updater (Módulo 1) para evaluar la última v
 
 ## 5. Integración con Otros Módulos
 
-*   **Módulo 1 (Datos):** Dependencia crítica. El Monitor no puede evaluar si el Data Updater no ha traído la última vela. Debe haber un mecanismo de sincronización (ej. el Monitor espera a que el Data Updater marque el archivo como 'fresh').
+*   **Módulo 1 (Datos):** El Monitor no depende del Data Updater para evaluar la última vela (ver sección 2.5), pero debe verificar que el `timestamp` de la vela obtenida de Binance sea posterior al último evaluado para evitar señales duplicadas.
 *   **Módulo 2 (Estrategias):** Consume la lógica `calculate()` de los patrones.
 *   **Módulo 5 (Portafolio):** Lee la configuración de qué estrategias vigilar. Si el usuario pausa una estrategia en el Portafolio, el Monitor debe detener su Job inmediatamente.
 *   **Módulo 7 (Trade Journal):** El Monitor *genera* la señal, el Journal *registra* la ejecución humana. El botón "Registrar en Journal" debe pasar el `signal_id` para vincularlos.
