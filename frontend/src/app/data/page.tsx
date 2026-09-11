@@ -5,7 +5,7 @@ import { Download, Loader2, Trash2 } from "lucide-react";
 
 import ImportModal from "@/components/data/ImportModal";
 import FreshnessBadge from "@/components/data/FreshnessBadge";
-import { getDataStatus } from "@/lib/api";
+import { getDataStatus, deleteDataFile } from "@/lib/api";
 import type { MarketDataFile } from "@/types/data";
 
 function formatSize(mb: number): string {
@@ -40,6 +40,26 @@ export default function DataPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleDelete = useCallback(
+    async (fileId: string) => {
+      if (
+        !confirm(
+          "¿Estás seguro de que deseas eliminar este archivo de datos? Esta acción no se puede deshacer y borrará el histórico."
+        )
+      )
+        return;
+      try {
+        await deleteDataFile(fileId);
+        loadData();
+      } catch (err) {
+        alert(
+          err instanceof Error ? err.message : "Error al eliminar el archivo."
+        );
+      }
+    },
+    [loadData]
+  );
 
   useEffect(() => {
     const initial = setTimeout(() => void loadData(), 0);
@@ -172,10 +192,10 @@ export default function DataPage() {
                     </td>
                     <td className="px-5 py-3 text-right">
                       <button
-                        onClick={() => console.log("Eliminar", file.id)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400 transition hover:border-red-500/40 hover:text-red-400"
-                        aria-label={`Eliminar ${file.symbol} ${file.timeframe}`}
-                      >
+                          onClick={() => handleDelete(file.id)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400 transition hover:border-red-500/40 hover:text-red-400"
+                          aria-label={`Eliminar ${file.symbol} ${file.timeframe}`}
+                        >
                         <Trash2 className="h-3.5 w-3.5" />
                         Eliminar
                       </button>

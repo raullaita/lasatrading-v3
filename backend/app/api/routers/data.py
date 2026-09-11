@@ -179,6 +179,27 @@ def data_status(db: Session = Depends(get_db)):
     return result
 
 
+@router.delete("/{file_id}")
+def delete_file(file_id: str, db: Session = Depends(get_db)):
+    file_record = db.execute(
+        select(MarketDataFile).where(MarketDataFile.id == file_id)
+    ).scalar_one_or_none()
+
+    if file_record is None:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+    try:
+        if file_record.file_path and os.path.exists(file_record.file_path):
+            os.remove(file_record.file_path)
+    except Exception as exc:
+        logger.warning("No se pudo eliminar el archivo en disco: %s", exc)
+
+    db.delete(file_record)
+    db.commit()
+
+    return {"message": "Archivo eliminado correctamente"}
+
+
 @router.post("/import", status_code=202)
 def import_data(payload: ImportRequest, background_tasks: BackgroundTasks):
     for timeframe in payload.timeframes:

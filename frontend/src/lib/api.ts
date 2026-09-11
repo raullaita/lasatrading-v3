@@ -78,6 +78,12 @@ export function importData(payload: {
   });
 }
 
+export function deleteDataFile(fileId: string): Promise<void> {
+  return request<void>(`/api/v1/data/${fileId}`, {
+    method: "DELETE",
+  });
+}
+
 export function getWatchlist(): Promise<WatchlistItem[]> {
   return request<WatchlistItem[]>("/api/v1/watchlist");
 }
