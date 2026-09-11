@@ -137,3 +137,38 @@ class SignalLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=func.now()
     )
+
+
+class Trade(Base):
+    __tablename__ = "trades"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    trade_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True
+    )
+    signal_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True
+    )
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False)
+    direction: Mapped[str] = mapped_column(String(10), nullable=False)
+    entry_price_expected: Mapped[float | None] = mapped_column(Float, nullable=True)
+    entry_price_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    entry_timestamp: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    exit_price_expected: Mapped[float | None] = mapped_column(Float, nullable=True)
+    exit_price_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    exit_timestamp: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    commission: Mapped[float] = mapped_column(Float, default=0.0)
+    pnl_net: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now()
+    )

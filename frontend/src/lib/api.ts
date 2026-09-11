@@ -22,6 +22,14 @@ import type {
   SignalLog,
   TestTelegramResult,
 } from "@/types/monitor";
+import type {
+  CreateTradePayload,
+  ExecutionAnalysis,
+  ExecutionAnalysisRequest,
+  JournalQueryParams,
+  Trade,
+  UpdateTradePayload,
+} from "@/types/journal";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -186,5 +194,51 @@ export function deletePriceAlert(id: string): Promise<{ status: string; id: stri
 export function testTelegram(): Promise<TestTelegramResult> {
   return request<TestTelegramResult>("/api/v1/monitor/test-telegram", {
     method: "POST",
+  });
+}
+
+function buildQuery(params: object): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export function getTrades(params: JournalQueryParams = {}): Promise<Trade[]> {
+  return request<Trade[]>(`/api/v1/journal/trades${buildQuery(params)}`);
+}
+
+export function createTrade(payload: CreateTradePayload): Promise<Trade> {
+  return request<Trade>("/api/v1/journal/trades", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateTrade(
+  id: string,
+  payload: UpdateTradePayload
+): Promise<Trade> {
+  return request<Trade>(`/api/v1/journal/trades/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteTrade(id: string): Promise<{ status: string; id: string }> {
+  return request<{ status: string; id: string }>(
+    `/api/v1/journal/trades/${id}`,
+    { method: "DELETE" }
+  );
+}
+
+export function analyzeExecution(
+  payload: ExecutionAnalysisRequest
+): Promise<ExecutionAnalysis> {
+  return request<ExecutionAnalysis>("/api/v1/journal/analyze-execution", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

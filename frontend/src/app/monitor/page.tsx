@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   Bell,
@@ -45,6 +46,7 @@ function formatTime(iso: string): string {
 }
 
 export default function MonitorPage() {
+  const router = useRouter();
   const [jobs, setJobs] = useState<MonitorJob[]>([]);
   const [strategies, setStrategies] = useState<UserStrategy[]>([]);
   const [signals, setSignals] = useState<SignalLog[]>([]);
@@ -164,6 +166,19 @@ export default function MonitorPage() {
         err instanceof Error ? err.message : "No se pudo enviar el mensaje de prueba."
       );
     }
+  };
+
+  const handleRegisterInJournal = (signal: SignalLog) => {
+    const params = new URLSearchParams({
+      new_trade: "true",
+      symbol: signal.symbol,
+      direction: signal.signal_type === "sell" ? "short" : "long",
+      entry_price_expected: signal.price.toFixed(8),
+      signal_timestamp: signal.timestamp,
+      tf: signal.timeframe,
+      strategy_name: signal.strategy_name,
+    });
+    router.push(`/journal?${params.toString()}`);
   };
 
   const runningCount = activeJobs.length;
@@ -404,7 +419,7 @@ export default function MonitorPage() {
                         </p>
                       ) : null}
                       <button
-                        onClick={() => console.log("Registrar en Journal", signal.id)}
+                        onClick={() => handleRegisterInJournal(signal)}
                         className="mt-1 rounded-md border border-slate-700 px-2 py-1 text-[10px] font-medium text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
                       >
                         Registrar en Journal

@@ -3,7 +3,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import backtest, data, monitor, optimizer, portfolio, strategies, watchlist
+from app.api.routers import (
+    backtest,
+    data,
+    journal,
+    monitor,
+    optimizer,
+    portfolio,
+    strategies,
+    watchlist,
+)
 from app.core.models import Base
 from app.core.strategies.registry import registry
 from app.infra.db import engine
@@ -39,6 +48,7 @@ app.include_router(backtest.router)
 app.include_router(optimizer.router)
 app.include_router(portfolio.router)
 app.include_router(monitor.router)
+app.include_router(journal.router)
 
 
 @app.get("/api/v1/health")
