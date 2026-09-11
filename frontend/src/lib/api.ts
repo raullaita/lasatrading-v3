@@ -16,6 +16,12 @@ import type {
   UpdateStrategyPayload,
   UserStrategy,
 } from "@/types/portfolio";
+import type {
+  MonitorJob,
+  PriceAlert,
+  SignalLog,
+  TestTelegramResult,
+} from "@/types/monitor";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -144,5 +150,41 @@ export function deleteStrategy(id: string): Promise<{ status: string; id: string
 export function toggleStrategy(id: string): Promise<UserStrategy> {
   return request<UserStrategy>(`/api/v1/portfolio/strategies/${id}/toggle`, {
     method: "PATCH",
+  });
+}
+
+export function getMonitorJobs(): Promise<MonitorJob[]> {
+  return request<MonitorJob[]>("/api/v1/monitor/jobs");
+}
+
+export function getSignals(limit = 50): Promise<SignalLog[]> {
+  return request<SignalLog[]>(`/api/v1/monitor/signals?limit=${limit}`);
+}
+
+export function getPriceAlerts(): Promise<PriceAlert[]> {
+  return request<PriceAlert[]>("/api/v1/monitor/price-alerts");
+}
+
+export function createPriceAlert(payload: {
+  symbol: string;
+  condition: string;
+  target_price: number;
+}): Promise<PriceAlert> {
+  return request<PriceAlert>("/api/v1/monitor/price-alerts", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deletePriceAlert(id: string): Promise<{ status: string; id: string }> {
+  return request<{ status: string; id: string }>(
+    `/api/v1/monitor/price-alerts/${id}`,
+    { method: "DELETE" }
+  );
+}
+
+export function testTelegram(): Promise<TestTelegramResult> {
+  return request<TestTelegramResult>("/api/v1/monitor/test-telegram", {
+    method: "POST",
   });
 }

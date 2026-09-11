@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import VALID_TIMEFRAMES
-from app.core.models import UserStrategy
+from app.core.models import MonitorJob, UserStrategy
 from app.core.strategies.registry import registry
 from app.infra.db import get_db
 
@@ -146,6 +146,13 @@ def update_strategy(
 @router.delete("/strategies/{strategy_id}")
 def delete_strategy(strategy_id: str, db: Session = Depends(get_db)) -> dict:
     item = _get_strategy_or_404(db, strategy_id)
+    job = (
+        db.execute(select(MonitorJob).where(MonitorJob.user_strategy_id == item.id))
+        .scalars()
+        .first()
+    )
+    if job is not None:
+        db.delete(job)
     db.delete(item)
     db.commit()
     return {"status": "deleted", "id": strategy_id}
@@ -156,6 +163,27 @@ def toggle_strategy(strategy_id: str, db: Session = Depends(get_db)) -> dict:
     item = _get_strategy_or_404(db, strategy_id)
     item.is_active = not item.is_active
     item.updated_at = datetime.now(timezone.utc)
+
+    job = (
+        db.execute(select(MonitorJob).where(MonitorJob.user_strategy_id == item.id))
+        .scalars()
+        .first()
+    )
+    if item.is_active:
+        if job is None:
+            job = MonitorJob(
+                user_strategy_id=item.id,
+                status="running",
+                error_count=0,
+            )
+            db.add(job)
+        else:
+            job.status = "running"
+            job.error_count = 0
+    else:
+        if job is not None:
+            job.status = "paused"
+
     db.commit()
     db.refresh(item)
     return _to_dict(item)

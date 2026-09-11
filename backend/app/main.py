@@ -3,16 +3,19 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import backtest, data, optimizer, portfolio, strategies, watchlist
+from app.api.routers import backtest, data, monitor, optimizer, portfolio, strategies, watchlist
 from app.core.models import Base
 from app.core.strategies.registry import registry
 from app.infra.db import engine
+from app.services.task_manager import start_task_manager, stop_task_manager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    start_task_manager()
     yield
+    stop_task_manager()
 
 
 app = FastAPI(
@@ -35,6 +38,7 @@ app.include_router(strategies.router)
 app.include_router(backtest.router)
 app.include_router(optimizer.router)
 app.include_router(portfolio.router)
+app.include_router(monitor.router)
 
 
 @app.get("/api/v1/health")
