@@ -5,6 +5,12 @@ import type {
   BacktestTaskResult,
 } from "@/types/backtest";
 import type { StrategyCatalogItem } from "@/types/strategies";
+import type {
+  OptimizationQueued,
+  OptimizationRequest,
+  OptimizationResult,
+  OptimizationStatusResponse,
+} from "@/types/optimizer";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -66,4 +72,33 @@ export function runBacktest(payload: BacktestRequest): Promise<BacktestQueued> {
 
 export function getBacktestResults(taskId: string): Promise<BacktestTaskResult> {
   return request<BacktestTaskResult>(`/api/v1/backtest/results/${taskId}`);
+}
+
+export function runOptimization(
+  payload: OptimizationRequest
+): Promise<OptimizationQueued> {
+  return request<OptimizationQueued>("/api/v1/optimizer/run", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getOptimizationStatus(
+  taskId: string
+): Promise<OptimizationStatusResponse> {
+  return request<OptimizationStatusResponse>(
+    `/api/v1/optimizer/status/${taskId}`
+  );
+}
+
+export function cancelOptimization(taskId: string): Promise<void> {
+  return request<void>(`/api/v1/optimizer/cancel/${taskId}`, {
+    method: "POST",
+  });
+}
+
+export function getOptimizationResults(
+  taskId: string
+): Promise<OptimizationResult> {
+  return request<OptimizationResult>(`/api/v1/optimizer/results/${taskId}`);
 }
