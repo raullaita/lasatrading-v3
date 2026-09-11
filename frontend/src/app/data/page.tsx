@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, Loader2, Trash2 } from "lucide-react";
 
 import ImportModal from "@/components/data/ImportModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import FreshnessBadge from "@/components/data/FreshnessBadge";
 import { getDataStatus, deleteDataFile } from "@/lib/api";
 import type { MarketDataFile } from "@/types/data";
@@ -26,6 +27,9 @@ export default function DataPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -41,25 +45,33 @@ export default function DataPage() {
     }
   }, []);
 
-  const handleDelete = useCallback(
-    async (fileId: string) => {
-      if (
-        !confirm(
-          "¿Estás seguro de que deseas eliminar este archivo de datos? Esta acción no se puede deshacer y borrará el histórico."
-        )
-      )
-        return;
-      try {
-        await deleteDataFile(fileId);
-        loadData();
-      } catch (err) {
-        alert(
-          err instanceof Error ? err.message : "Error al eliminar el archivo."
-        );
-      }
-    },
-    [loadData]
-  );
+  const handleDelete = useCallback((fileId: string) => {
+    setItemToDelete(fileId);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const handleCancelDelete = useCallback(() => {
+    if (deleteLoading) return;
+    setDeleteDialogOpen(false);
+    setItemToDelete(null);
+  }, [deleteLoading]);
+
+  const executeDelete = useCallback(async () => {
+    if (!itemToDelete) return;
+    setDeleteLoading(true);
+    try {
+      await deleteDataFile(itemToDelete);
+      await loadData();
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : "Error al eliminar el archivo."
+      );
+    } finally {
+      setDeleteLoading(false);
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+    }
+  }, [itemToDelete, loadData]);
 
   useEffect(() => {
     const initial = setTimeout(() => void loadData(), 0);
@@ -212,6 +224,15 @@ export default function DataPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onImported={loadData}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        title="¿Eliminar archivo de datos?"
+        message="Esta acción no se puede deshacer y borrará el histórico de este símbolo/timeframe."
+        onConfirm={executeDelete}
+        onCancel={handleCancelDelete}
+        isLoading={deleteLoading}
       />
     </main>
   );
