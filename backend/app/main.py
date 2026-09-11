@@ -9,6 +9,7 @@ from app.api.routers import (
     journal,
     monitor,
     optimizer,
+    performance,
     portfolio,
     strategies,
     watchlist,
@@ -49,6 +50,7 @@ app.include_router(optimizer.router)
 app.include_router(portfolio.router)
 app.include_router(monitor.router)
 app.include_router(journal.router)
+app.include_router(performance.router)
 
 
 @app.get("/api/v1/health")

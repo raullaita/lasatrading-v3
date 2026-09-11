@@ -30,6 +30,11 @@ import type {
   Trade,
   UpdateTradePayload,
 } from "@/types/journal";
+import type {
+  EquityPoint,
+  PerformanceSummary,
+  StrategyPerformance,
+} from "@/types/performance";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -241,4 +246,34 @@ export function analyzeExecution(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export interface PerformanceQueryParams {
+  trade_type?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export function getPerformanceSummary(
+  params: PerformanceQueryParams = {}
+): Promise<PerformanceSummary> {
+  return request<PerformanceSummary>(
+    `/api/v1/performance/summary${buildQuery(params)}`
+  );
+}
+
+export function getEquityCurve(
+  params: PerformanceQueryParams = {}
+): Promise<EquityPoint[]> {
+  return request<EquityPoint[]>(
+    `/api/v1/performance/equity-curve${buildQuery(params)}`
+  );
+}
+
+export function getPerformanceByStrategy(
+  params: PerformanceQueryParams = {}
+): Promise<StrategyPerformance[]> {
+  return request<StrategyPerformance[]>(
+    `/api/v1/performance/by-strategy${buildQuery(params)}`
+  );
 }
