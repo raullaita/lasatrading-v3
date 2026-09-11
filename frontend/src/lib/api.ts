@@ -63,6 +63,10 @@ export function getDataStatus(): Promise<MarketDataFile[]> {
   return request<MarketDataFile[]>("/api/v1/data/status");
 }
 
+export function getSymbols(): Promise<string[]> {
+  return request<string[]>("/api/v1/data/symbols");
+}
+
 export function importData(payload: {
   symbols: string[];
   timeframes: string[];

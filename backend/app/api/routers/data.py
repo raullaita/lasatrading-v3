@@ -24,6 +24,25 @@ _TASKS: dict[str, dict] = {}
 
 VALID_SYMBOL_RE = re.compile(r"^[A-Z0-9-]+$")
 
+# Top 50 most liquid USDT pairs on Binance (hardcoded for reliability)
+TOP_SYMBOLS: list[str] = [
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+    "ADAUSDT", "DOGEUSDT", "DOTUSDT", "MATICUSDT", "LTCUSDT",
+    "AVAXUSDT", "LINKUSDT", "ATOMUSDT", "UNIUSDT", "APTUSDT",
+    "NEARUSDT", "FILUSDT", "AAVEUSDT", "GRTUSDT", "SANDUSDT",
+    "AXSUSDT", "FLOWUSDT", "XTZUSDT", "ALGOUSDT", "VETUSDT",
+    "THETAUSDT", "EGLDUSDT", "ICPUSDT", "FTMUSDT", "HBARUSDT",
+    "WIFUSDT", "BONKUSDT", "TIAUSDT", "JUPUSDT", "WLDUSDT",
+    "RENDERUSDT", "ARUSDT", "SUIUSDT", "TAOUSDT", "SEIUSDT",
+    "ONDOUSDT", "RAYUSDT", "JTOUSDT", "PEPEUSDT", "FLOKIUSDT",
+    "SHIBUSDT", "LRCUSDT", "ENSUSDT", "MAGICUSDT", "SLPUSDT",
+]
+
+
+@router.get("/symbols")
+def get_symbols():
+    return TOP_SYMBOLS
+
 
 class ImportRequest(BaseModel):
     symbols: list[str]

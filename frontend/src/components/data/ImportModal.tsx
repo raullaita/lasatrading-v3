@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { importData } from "@/lib/api";
+import SymbolSelector from "@/components/ui/SymbolSelector";
 
 const TIMEFRAMES = ["1m", "3m", "5m", "15m", "1h", "4h", "1d", "1W", "1M"];
 
@@ -20,7 +21,8 @@ export default function ImportModal({
   onImported,
 }: ImportModalProps) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [symbols, setSymbols] = useState("");
+  const [selectedSymbol, setSelectedSymbol] = useState("");
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
   const [timeframes, setTimeframes] = useState<string[]>(["15m", "1h"]);
   const [startDate, setStartDate] = useState("");
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -31,6 +33,8 @@ export default function ImportModal({
     if (loading) return;
     setStep(1);
     setError(null);
+    setSelectedSymbol("");
+    setSelectedSymbols([]);
     onClose();
   }, [loading, onClose]);
 
@@ -42,14 +46,21 @@ export default function ImportModal({
     );
   };
 
-  const handleSubmit = async () => {
-    const parsedSymbols = symbols
-      .split(",")
-      .map((s) => s.trim().toUpperCase())
-      .filter(Boolean);
+  const handleAddSymbol = () => {
+    const sym = selectedSymbol.trim().toUpperCase();
+    if (sym && !selectedSymbols.includes(sym)) {
+      setSelectedSymbols((prev) => [...prev, sym]);
+    }
+    setSelectedSymbol("");
+  };
 
-    if (parsedSymbols.length === 0) {
-      setError("Introduce al menos un símbolo (ej. BTCUSDT, ETHUSDT).");
+  const handleRemoveSymbol = (symbol: string) => {
+    setSelectedSymbols((prev) => prev.filter((s) => s !== symbol));
+  };
+
+  const handleSubmit = async () => {
+    if (selectedSymbols.length === 0) {
+      setError("Añade al menos un símbolo a la lista.");
       return;
     }
     if (timeframes.length === 0) {
@@ -61,7 +72,7 @@ export default function ImportModal({
     setError(null);
     try {
       const result = await importData({
-        symbols: parsedSymbols,
+        symbols: selectedSymbols,
         timeframes,
         start_date: startDate,
       });
@@ -103,21 +114,47 @@ export default function ImportModal({
         {step === 1 ? (
           <div className="space-y-5 px-5 py-5">
             <div>
-              <label
-                htmlFor="symbols"
-                className="mb-1.5 block text-xs font-medium text-slate-300"
-              >
+              <label className="mb-1.5 block text-xs font-medium text-slate-300">
                 Símbolos
               </label>
-              <input
-                id="symbols"
-                type="text"
-                value={symbols}
-                onChange={(e) => setSymbols(e.target.value)}
-                placeholder="BTCUSDT, ETHUSDT"
-                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none"
-              />
+              <div className="flex gap-2">
+                <SymbolSelector
+                  value={selectedSymbol}
+                  onChange={setSelectedSymbol}
+                  placeholder="Buscar símbolo..."
+                />
+                <button
+                  type="button"
+                  onClick={handleAddSymbol}
+                  disabled={!selectedSymbol.trim()}
+                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="Añadir símbolo"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              {/* TODO: Este mismo componente SymbolSelector se usará en Backtest, Optimizer y Monitor */}
             </div>
+
+            {selectedSymbols.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {selectedSymbols.map((sym) => (
+                  <span
+                    key={sym}
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400"
+                  >
+                    {sym}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSymbol(sym)}
+                      className="ml-0.5 rounded-full p-0.5 text-emerald-400/70 transition hover:bg-emerald-500/20 hover:text-emerald-400"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
 
             <div>
               <span className="mb-1.5 block text-xs font-medium text-slate-300">
@@ -146,14 +183,10 @@ export default function ImportModal({
             </div>
 
             <div>
-              <label
-                htmlFor="start_date"
-                className="mb-1.5 block text-xs font-medium text-slate-300"
-              >
+              <label className="mb-1.5 block text-xs font-medium text-slate-300">
                 Fecha de inicio (opcional)
               </label>
               <input
-                id="start_date"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
