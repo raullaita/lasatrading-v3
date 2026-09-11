@@ -8,9 +8,11 @@ logger = logging.getLogger(__name__)
 TELEGRAM_API = "https://api.telegram.org"
 
 
-def send_telegram_message(text: str) -> bool:
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+def send_telegram_message(
+    text: str, bot_token: str | None = None, chat_id: str | None = None
+) -> bool:
+    bot_token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "")
+    chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID", "")
 
     if not bot_token or not chat_id:
         logger.warning("Telegram no configurado (falta TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID)")

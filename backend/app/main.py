@@ -12,6 +12,7 @@ from app.api.routers import (
     performance,
     portfolio,
     strategies,
+    system,
     watchlist,
 )
 from app.core.models import Base
@@ -51,6 +52,7 @@ app.include_router(portfolio.router)
 app.include_router(monitor.router)
 app.include_router(journal.router)
 app.include_router(performance.router)
+app.include_router(system.router)
 
 
 @app.get("/api/v1/health")

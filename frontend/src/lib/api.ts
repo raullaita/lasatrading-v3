@@ -35,6 +35,12 @@ import type {
   PerformanceSummary,
   StrategyPerformance,
 } from "@/types/performance";
+import type {
+  SystemConfig,
+  SystemHealth,
+  SystemLogEntry,
+  SystemLogsQuery,
+} from "@/types/system";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -275,5 +281,36 @@ export function getPerformanceByStrategy(
 ): Promise<StrategyPerformance[]> {
   return request<StrategyPerformance[]>(
     `/api/v1/performance/by-strategy${buildQuery(params)}`
+  );
+}
+
+export function getSystemConfig(): Promise<SystemConfig> {
+  return request<SystemConfig>("/api/v1/system/config");
+}
+
+export function updateSystemConfig(
+  updates: Record<string, string | number | boolean>
+): Promise<SystemConfig> {
+  return request<SystemConfig>("/api/v1/system/config", {
+    method: "PUT",
+    body: JSON.stringify({ updates }),
+  });
+}
+
+export function testSystemTelegram(): Promise<TestTelegramResult> {
+  return request<TestTelegramResult>("/api/v1/system/config/test-telegram", {
+    method: "POST",
+  });
+}
+
+export function getSystemHealth(): Promise<SystemHealth> {
+  return request<SystemHealth>("/api/v1/system/health");
+}
+
+export function getSystemLogs(
+  params: SystemLogsQuery = {}
+): Promise<SystemLogEntry[]> {
+  return request<SystemLogEntry[]>(
+    `/api/v1/system/logs${buildQuery(params)}`
   );
 }
