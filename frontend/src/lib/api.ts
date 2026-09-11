@@ -11,6 +11,11 @@ import type {
   OptimizationResult,
   OptimizationStatusResponse,
 } from "@/types/optimizer";
+import type {
+  CreateStrategyPayload,
+  UpdateStrategyPayload,
+  UserStrategy,
+} from "@/types/portfolio";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -101,4 +106,43 @@ export function getOptimizationResults(
   taskId: string
 ): Promise<OptimizationResult> {
   return request<OptimizationResult>(`/api/v1/optimizer/results/${taskId}`);
+}
+
+export function getStrategies(
+  activeOnly = false
+): Promise<UserStrategy[]> {
+  const query = activeOnly ? "?active_only=true" : "";
+  return request<UserStrategy[]>(`/api/v1/portfolio/strategies${query}`);
+}
+
+export function createStrategy(
+  data: CreateStrategyPayload
+): Promise<UserStrategy> {
+  return request<UserStrategy>("/api/v1/portfolio/strategies", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateStrategy(
+  id: string,
+  data: UpdateStrategyPayload
+): Promise<UserStrategy> {
+  return request<UserStrategy>(`/api/v1/portfolio/strategies/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteStrategy(id: string): Promise<{ status: string; id: string }> {
+  return request<{ status: string; id: string }>(
+    `/api/v1/portfolio/strategies/${id}`,
+    { method: "DELETE" }
+  );
+}
+
+export function toggleStrategy(id: string): Promise<UserStrategy> {
+  return request<UserStrategy>(`/api/v1/portfolio/strategies/${id}/toggle`, {
+    method: "PATCH",
+  });
 }

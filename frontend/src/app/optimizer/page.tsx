@@ -17,6 +17,7 @@ export default function OptimizerPage() {
   const [running, setRunning] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [result, setResult] = useState<OptimizationResult | null>(null);
+  const [lastRequest, setLastRequest] = useState<OptimizationRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [terminal, setTerminal] = useState<OptimizationStatus | null>(null);
 
@@ -25,6 +26,7 @@ export default function OptimizerPage() {
     setResult(null);
     setError(null);
     setTerminal(null);
+    setLastRequest(payload);
 
     try {
       const queued = await runOptimization(payload);
@@ -69,6 +71,7 @@ export default function OptimizerPage() {
     setTerminal(null);
     setError(null);
     setResult(null);
+    setLastRequest(null);
   }, []);
 
   return (
@@ -124,7 +127,7 @@ export default function OptimizerPage() {
             />
           ) : result ? (
             <div className="space-y-4">
-              <OptimizationResults result={result} />
+              <OptimizationResults result={result} request={lastRequest} />
               <button
                 onClick={handleNewRun}
                 className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-700"

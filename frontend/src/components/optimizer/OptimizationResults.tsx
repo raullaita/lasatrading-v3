@@ -10,9 +10,11 @@ import {
   XCircle,
 } from "lucide-react";
 
+import SendToPortfolioModal from "@/components/optimizer/SendToPortfolioModal";
 import { cn } from "@/lib/utils";
 import type {
   OptimizationCandidate,
+  OptimizationRequest,
   OptimizationResult,
   Verdict,
 } from "@/types/optimizer";
@@ -88,12 +90,19 @@ const SORT_LABELS: { key: SortKey; label: string }[] = [
   { key: "degradation", label: "Degradación" },
 ];
 
-export default function OptimizationResults({ result }: { result: OptimizationResult }) {
+export default function OptimizationResults({
+  result,
+  request,
+}: {
+  result: OptimizationResult;
+  request?: OptimizationRequest | null;
+}) {
   const [filter, setFilter] = useState<Verdict | "all">("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
     key: "pf_oos",
     dir: -1,
   });
+  const [sendTarget, setSendTarget] = useState<OptimizationCandidate | null>(null);
 
   const counts = useMemo(() => {
     const robust = result.candidates.filter((c) => c.verdict === "robust").length;
@@ -125,7 +134,7 @@ export default function OptimizationResults({ result }: { result: OptimizationRe
   };
 
   const handleSendToPortfolio = (candidate: OptimizationCandidate) => {
-    console.log("Enviar al Portafolio (Módulo 5):", candidate);
+    setSendTarget(candidate);
   };
 
   const summaryCards = [
@@ -288,6 +297,15 @@ export default function OptimizationResults({ result }: { result: OptimizationRe
           </div>
         )}
       </section>
+
+      {sendTarget && (
+        <SendToPortfolioModal
+          key={sendTarget.rank}
+          candidate={sendTarget}
+          request={request ?? null}
+          onClose={() => setSendTarget(null)}
+        />
+      )}
     </div>
   );
 }
