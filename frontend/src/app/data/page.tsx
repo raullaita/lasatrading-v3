@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, Loader2, Trash2 } from "lucide-react";
+import { Download, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 import ImportModal from "@/components/data/ImportModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import FreshnessBadge from "@/components/data/FreshnessBadge";
-import { getDataStatus, deleteDataFile } from "@/lib/api";
+import { getDataStatus, deleteDataFile, refreshDataFile } from "@/lib/api";
 import type { MarketDataFile } from "@/types/data";
 
 function formatSize(mb: number): string {
@@ -30,6 +30,7 @@ export default function DataPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -72,6 +73,25 @@ export default function DataPage() {
       setItemToDelete(null);
     }
   }, [itemToDelete, loadData]);
+
+  const handleRefresh = useCallback(
+    async (fileId: string) => {
+      if (refreshingId) return;
+      setRefreshingId(fileId);
+      try {
+        const result = await refreshDataFile(fileId);
+        await loadData();
+        alert(`Datos actualizados. Añadidas ${result.new_candles} velas nuevas.`);
+      } catch (err) {
+        alert(
+          err instanceof Error ? err.message : "Error al actualizar los datos."
+        );
+      } finally {
+        setRefreshingId(null);
+      }
+    },
+    [refreshingId, loadData]
+  );
 
   useEffect(() => {
     const initial = setTimeout(() => void loadData(), 0);
@@ -203,14 +223,27 @@ export default function DataPage() {
                       <FreshnessBadge status={file.freshness_status} />
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <button
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleRefresh(file.id)}
+                          disabled={refreshingId === file.id}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400 transition hover:border-emerald-500/40 hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                          aria-label={`Actualizar ${file.symbol} ${file.timeframe}`}
+                        >
+                          <RefreshCw
+                            className={`h-3.5 w-3.5 ${refreshingId === file.id ? "animate-spin" : ""}`}
+                          />
+                          Actualizar
+                        </button>
+                        <button
                           onClick={() => handleDelete(file.id)}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400 transition hover:border-red-500/40 hover:text-red-400"
                           aria-label={`Eliminar ${file.symbol} ${file.timeframe}`}
                         >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Eliminar
-                      </button>
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Eliminar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

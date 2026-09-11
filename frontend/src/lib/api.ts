@@ -84,6 +84,17 @@ export function deleteDataFile(fileId: string): Promise<void> {
   });
 }
 
+export function refreshDataFile(
+  fileId: string
+): Promise<{ message: string; new_candles: number }> {
+  return request<{ message: string; new_candles: number }>(
+    `/api/v1/data/${fileId}/refresh`,
+    {
+      method: "POST",
+    }
+  );
+}
+
 export function getWatchlist(): Promise<WatchlistItem[]> {
   return request<WatchlistItem[]>("/api/v1/watchlist");
 }

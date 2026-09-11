@@ -200,6 +200,56 @@ def delete_file(file_id: str, db: Session = Depends(get_db)):
     return {"message": "Archivo eliminado correctamente"}
 
 
+@router.post("/{file_id}/refresh")
+def refresh_file(file_id: str, db: Session = Depends(get_db)):
+    file_record = db.execute(
+        select(MarketDataFile).where(MarketDataFile.id == file_id)
+    ).scalar_one_or_none()
+
+    if file_record is None:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+    symbol = file_record.symbol
+    timeframe = file_record.timeframe
+
+    try:
+        candles = fetch_klines(symbol, timeframe, limit=10)
+    except RuntimeError as exc:
+        logger.error("Refresh fallido para %s %s (red/Binance): %s", symbol, timeframe, exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("Refresh fallido para %s %s: %s", symbol, timeframe, exc)
+        raise HTTPException(status_code=500, detail=f"Error al obtener datos de Binance: {exc}") from exc
+
+    try:
+        new_candles = append_candles(file_record.file_path, candles)
+    except Exception as exc:
+        logger.error("Refresh fallido al guardar %s %s: %s", symbol, timeframe, exc)
+        raise HTTPException(status_code=500, detail=f"Error al guardar los datos: {exc}") from exc
+
+    metadata = get_parquet_metadata(file_record.file_path)
+    if metadata is None:
+        raise HTTPException(
+            status_code=500, detail=f"No se pudo leer el archivo Parquet para {symbol} {timeframe}"
+        )
+
+    file_record.row_count = metadata["row_count"]
+    file_record.first_candle_at = metadata["first_candle_at"]
+    file_record.last_candle_at = metadata["last_candle_at"]
+    file_record.file_size_mb = metadata["file_size_mb"]
+    file_record.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    logger.info(
+        "Refresh completado: %s %s (%d velas nuevas)",
+        symbol,
+        timeframe,
+        new_candles,
+    )
+
+    return {"message": "Datos actualizados correctamente", "new_candles": new_candles}
+
+
 @router.post("/import", status_code=202)
 def import_data(payload: ImportRequest, background_tasks: BackgroundTasks):
     for timeframe in payload.timeframes:
