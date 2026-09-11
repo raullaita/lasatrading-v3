@@ -4,6 +4,7 @@ import "./globals.css";
 
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Topbar />
           <div className="flex-1 overflow-y-auto">{children}</div>
         </main>
+        <Toaster theme="dark" position="top-right" richColors />
       </body>
     </html>
   );

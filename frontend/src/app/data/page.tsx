@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Download, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import ImportModal from "@/components/data/ImportModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -63,8 +64,9 @@ export default function DataPage() {
     try {
       await deleteDataFile(itemToDelete);
       await loadData();
+      toast.success("Archivo eliminado correctamente.");
     } catch (err) {
-      alert(
+      toast.error(
         err instanceof Error ? err.message : "Error al eliminar el archivo."
       );
     } finally {
@@ -81,9 +83,9 @@ export default function DataPage() {
       try {
         const result = await refreshDataFile(fileId);
         await loadData();
-        alert(`Datos actualizados. Añadidas ${result.new_candles} velas nuevas.`);
+        toast.success(`Añadidas ${result.new_candles} velas nuevas.`);
       } catch (err) {
-        alert(
+        toast.error(
           err instanceof Error ? err.message : "Error al actualizar los datos."
         );
       } finally {
