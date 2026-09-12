@@ -4,6 +4,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.backtest_engine import run_backtest
@@ -111,6 +112,86 @@ def run_backtest_endpoint(payload: BacktestRequest, background_tasks: Background
     _BACKTEST_RESULTS[task_id] = {"status": "running"}
     background_tasks.add_task(_execute_backtest, task_id, payload)
     return {"task_id": task_id, "status": "queued"}
+
+
+def _run_to_summary(run: BacktestRun) -> dict:
+    return {
+        "id": str(run.id),
+        "symbol": run.symbol,
+        "timeframe": run.timeframe,
+        "strategy_name": run.strategy_name,
+        "metrics": run.metrics,
+        "created_at": run.created_at,
+    }
+
+
+@router.get("/history")
+def list_backtests(
+    strategy_name: str | None = None,
+    symbol: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    stmt = select(BacktestRun)
+    if strategy_name:
+        stmt = stmt.where(BacktestRun.strategy_name == strategy_name)
+    if symbol:
+        stmt = stmt.where(BacktestRun.symbol == symbol)
+    stmt = stmt.order_by(BacktestRun.created_at.desc()).offset(offset).limit(limit)
+
+    db: Session = SessionLocal()
+    try:
+        runs = db.execute(stmt).scalars().all()
+    finally:
+        db.close()
+    return [_run_to_summary(run) for run in runs]
+
+
+@router.get("/{backtest_id}")
+def get_backtest_detail(backtest_id: str) -> dict:
+    try:
+        run_uuid = uuid.UUID(backtest_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Backtest no encontrado") from exc
+
+    db: Session = SessionLocal()
+    try:
+        run = db.get(BacktestRun, run_uuid)
+    finally:
+        db.close()
+
+    if run is None:
+        raise HTTPException(status_code=404, detail="Backtest no encontrado")
+    return {
+        **_run_to_summary(run),
+        "params": run.params,
+        "exit_rules": run.exit_rules,
+        "equity_curve": run.equity_curve,
+        "trades": run.trades,
+    }
+
+
+@router.delete("/{backtest_id}")
+def delete_backtest(backtest_id: str) -> dict:
+    try:
+        run_uuid = uuid.UUID(backtest_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Backtest no encontrado") from exc
+
+    db: Session = SessionLocal()
+    try:
+        run = db.get(BacktestRun, run_uuid)
+        if run is None:
+            raise HTTPException(status_code=404, detail="Backtest no encontrado")
+        db.delete(run)
+        db.commit()
+    finally:
+        db.close()
+
+    _BACKTEST_RESULTS.pop(backtest_id, None)
+    return {"status": "deleted", "id": backtest_id}
 
 
 @router.get("/results/{task_id}")

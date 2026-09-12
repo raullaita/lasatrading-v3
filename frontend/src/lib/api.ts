@@ -1,7 +1,9 @@
 import type { MarketDataFile, WatchlistItem } from "@/types/data";
 import type {
+  BacktestDetail,
   BacktestQueued,
   BacktestRequest,
+  BacktestRun,
   BacktestTaskResult,
 } from "@/types/backtest";
 import type { StrategyCatalogItem } from "@/types/strategies";
@@ -123,6 +125,29 @@ export function runBacktest(payload: BacktestRequest): Promise<BacktestQueued> {
 
 export function getBacktestResults(taskId: string): Promise<BacktestTaskResult> {
   return request<BacktestTaskResult>(`/api/v1/backtest/results/${taskId}`);
+}
+
+export function getBacktestHistory(
+  filters: {
+    strategy_name?: string;
+    symbol?: string;
+    limit?: number;
+    offset?: number;
+  } = {}
+): Promise<BacktestRun[]> {
+  return request<BacktestRun[]>(`/api/v1/backtest/history${buildQuery(filters)}`);
+}
+
+export function getBacktestDetail(id: string): Promise<BacktestDetail> {
+  return request<BacktestDetail>(`/api/v1/backtest/${id}`);
+}
+
+export function deleteBacktest(
+  id: string
+): Promise<{ status: string; id: string }> {
+  return request<{ status: string; id: string }>(`/api/v1/backtest/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export function runOptimization(

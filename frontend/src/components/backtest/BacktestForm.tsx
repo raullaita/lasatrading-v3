@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Cpu, Loader2, Play, Settings2, TrendingDown, Wallet } from "lucide-react";
+import { Loader2, Play } from "lucide-react";
 
 import { getDataStatus, getStrategiesCatalog } from "@/lib/api";
 import type { BacktestRequest, ExitRules } from "@/types/backtest";
@@ -17,27 +17,23 @@ const TP_TYPES = [
   { value: "fixed_percent", label: "% fijo", step: 0.01 },
 ];
 
+const DEFAULT_EXIT_RULES: ExitRules = {
+  stop_loss_type: "atr_multiplier",
+  stop_loss_value: 1.5,
+  take_profit_type: "risk_reward_ratio",
+  take_profit_value: 2.0,
+};
+
 interface BacktestFormProps {
   running: boolean;
   onRun: (request: BacktestRequest) => void;
+  initial?: Partial<BacktestRequest>;
 }
 
-function SectionTitle({
-  number,
-  title,
-  icon,
-}: {
-  number: number;
-  title: string;
-  icon: React.ReactNode;
-}) {
+function SectionTitle({ title }: { title: string }) {
   return (
-    <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
-      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-emerald-400">
-        {number}
-      </span>
-      {icon}
-      {title}
+    <h2 className="text-sm font-semibold text-slate-100">
+      <span className="mr-2">{title}</span>
     </h2>
   );
 }
@@ -112,7 +108,20 @@ function SelectField({
   );
 }
 
-export default function BacktestForm({ running, onRun }: BacktestFormProps) {
+function defaultsFor(strategy: StrategyCatalogItem): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(strategy.parameters_schema).map(([key, schema]) => [
+      key,
+      (schema.default as number) ?? 0,
+    ])
+  );
+}
+
+export default function BacktestForm({
+  running,
+  onRun,
+  initial,
+}: BacktestFormProps) {
   const [catalog, setCatalog] = useState<StrategyCatalogItem[]>([]);
   const [strategiesLoading, setStrategiesLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -122,38 +131,37 @@ export default function BacktestForm({ running, onRun }: BacktestFormProps) {
   const [symbolsLoading, setSymbolsLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
 
-  const [symbol, setSymbol] = useState("");
-  const [timeframe, setTimeframe] = useState("");
+  const [symbol, setSymbol] = useState(initial?.symbol ?? "");
+  const [timeframe, setTimeframe] = useState(initial?.timeframe ?? "");
 
-  const [strategyName, setStrategyName] = useState("");
-  const [strategyParams, setStrategyParams] = useState<Record<string, number>>({});
+  const [strategyName, setStrategyName] = useState(initial?.strategy_name ?? "");
+  const [strategyParams, setStrategyParams] = useState<Record<string, number>>(
+    initial?.strategy_params ?? {}
+  );
 
-  const [exitRules, setExitRules] = useState<ExitRules>({
-    stop_loss_type: "atr_multiplier",
-    stop_loss_value: 1.5,
-    take_profit_type: "risk_reward_ratio",
-    take_profit_value: 2.0,
-  });
+  const [exitRules, setExitRules] = useState<ExitRules>(
+    initial?.exit_rules ?? DEFAULT_EXIT_RULES
+  );
 
-  const [initialCapital, setInitialCapital] = useState(10000);
-  const [commissionPct, setCommissionPct] = useState(0.001);
-  const [slippagePct, setSlippagePct] = useState(0.1);
+  const [initialCapital, setInitialCapital] = useState(
+    initial?.initial_capital ?? 10000
+  );
+  const [commissionPct, setCommissionPct] = useState(
+    initial?.commission_pct ?? 0.001
+  );
+  const [slippagePct, setSlippagePct] = useState(initial?.slippage_pct ?? 0.1);
+
+  const hasPrefill =
+    Boolean(initial?.strategy_name) && Object.keys(initial?.strategy_params ?? {}).length > 0;
 
   useEffect(() => {
-    const initial = setTimeout(() => {
+    const timer = setTimeout(() => {
       void getStrategiesCatalog()
         .then((items) => {
           setCatalog(items);
-          if (items.length > 0) {
+          if (items.length > 0 && !hasPrefill) {
             setStrategyName(items[0].name);
-            setStrategyParams(
-              Object.fromEntries(
-                Object.entries(items[0].parameters_schema).map(([key, schema]) => [
-                  key,
-                  (schema.default as number) ?? 0,
-                ])
-              )
-            );
+            setStrategyParams(defaultsFor(items[0]));
           }
         })
         .catch(() => {
@@ -166,15 +174,17 @@ export default function BacktestForm({ running, onRun }: BacktestFormProps) {
           const nextTimeframes = [...new Set(data.map((d) => d.timeframe))];
           setSymbols(nextSymbols);
           setTimeframes(nextTimeframes);
-          if (nextSymbols.length > 0) setSymbol(nextSymbols[0]);
-          if (nextTimeframes.length > 0) setTimeframe(nextTimeframes[0]);
+          if (symbol === "" && nextSymbols.length > 0) setSymbol(nextSymbols[0]);
+          if (timeframe === "" && nextTimeframes.length > 0)
+            setTimeframe(nextTimeframes[0]);
         })
         .catch(() => {
           setDataError("No se pudieron cargar los datos importados.");
         })
         .finally(() => setSymbolsLoading(false));
     }, 0);
-    return () => clearTimeout(initial);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedStrategy = catalog.find((s) => s.name === strategyName);
@@ -183,14 +193,7 @@ export default function BacktestForm({ running, onRun }: BacktestFormProps) {
     const strategy = catalog.find((s) => s.name === name);
     if (!strategy) return;
     setStrategyName(name);
-    setStrategyParams(
-      Object.fromEntries(
-        Object.entries(strategy.parameters_schema).map(([key, schema]) => [
-          key,
-          (schema.default as number) ?? 0,
-        ])
-      )
-    );
+    setStrategyParams(defaultsFor(strategy));
   };
 
   const handleSubmit = () => {
@@ -208,19 +211,19 @@ export default function BacktestForm({ running, onRun }: BacktestFormProps) {
   };
 
   return (
-    <div className="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-      <SectionTitle number={1} title="Datos" icon={<Settings2 className="h-3.5 w-3.5 text-emerald-400" />} />
-      {dataError && (
-        <p className="mb-2 text-xs text-red-400" role="alert">
-          {dataError}
-        </p>
-      )}
-      {!dataError && !symbolsLoading && symbols.length === 0 && (
-        <p className="mb-2 text-xs text-yellow-400">
-          No hay datos importados. Ve al Módulo de Datos para importar.
-        </p>
-      )}
-      <div className="space-y-3">
+    <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+      <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <SectionTitle title="📊 Datos" />
+        {dataError && (
+          <p className="text-xs text-red-400" role="alert">
+            {dataError}
+          </p>
+        )}
+        {!dataError && !symbolsLoading && symbols.length === 0 && (
+          <p className="text-xs text-yellow-400">
+            No hay datos importados. Ve al Módulo de Datos para importar.
+          </p>
+        )}
         <SelectField
           label="Símbolo"
           value={symbol}
@@ -235,15 +238,15 @@ export default function BacktestForm({ running, onRun }: BacktestFormProps) {
           disabled={symbolsLoading || timeframes.length === 0}
           options={timeframes.map((t) => ({ value: t, label: t }))}
         />
-      </div>
+      </section>
 
-      <SectionTitle number={2} title="Estrategia" icon={<Cpu className="h-3.5 w-3.5 text-emerald-400" />} />
-      {catalogError && (
-        <p className="mb-2 text-xs text-red-400" role="alert">
-          {catalogError}
-        </p>
-      )}
-      <div className="space-y-3">
+      <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <SectionTitle title="🧠 Estrategia" />
+        {catalogError && (
+          <p className="text-xs text-red-400" role="alert">
+            {catalogError}
+          </p>
+        )}
         <SelectField
           label="Estrategia"
           value={strategyName}
@@ -266,57 +269,74 @@ export default function BacktestForm({ running, onRun }: BacktestFormProps) {
               }
             />
           ))}
-      </div>
+      </section>
 
-      <SectionTitle number={3} title="Reglas de Salida" icon={<TrendingDown className="h-3.5 w-3.5 text-emerald-400" />} />
-      <div className="grid grid-cols-2 gap-3">
-        <SelectField
-          label="Stop Loss"
-          value={exitRules.stop_loss_type}
-          onChange={(value) => setExitRules((prev) => ({ ...prev, stop_loss_type: value }))}
-          options={SL_TYPES}
-        />
-        <NumberField
-          label="Valor SL"
-          value={exitRules.stop_loss_value}
-          onChange={(value) => setExitRules((prev) => ({ ...prev, stop_loss_value: value }))}
-        />
-        <SelectField
-          label="Take Profit"
-          value={exitRules.take_profit_type}
-          onChange={(value) => setExitRules((prev) => ({ ...prev, take_profit_type: value }))}
-          options={TP_TYPES}
-        />
-        <NumberField
-          label="Valor TP"
-          value={exitRules.take_profit_value}
-          onChange={(value) => setExitRules((prev) => ({ ...prev, take_profit_value: value }))}
-        />
-      </div>
+      <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <SectionTitle title="🎯 Reglas de Salida" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <SelectField
+            label="Stop Loss"
+            value={exitRules.stop_loss_type}
+            onChange={(value) =>
+              setExitRules((prev) => ({ ...prev, stop_loss_type: value }))
+            }
+            options={SL_TYPES}
+          />
+          <NumberField
+            label="Valor SL"
+            value={exitRules.stop_loss_value}
+            onChange={(value) =>
+              setExitRules((prev) => ({ ...prev, stop_loss_value: value }))
+            }
+            helper="Multiplicador de ATR o porcentaje fijo de salida."
+          />
+          <SelectField
+            label="Take Profit"
+            value={exitRules.take_profit_type}
+            onChange={(value) =>
+              setExitRules((prev) => ({ ...prev, take_profit_type: value }))
+            }
+            options={TP_TYPES}
+          />
+          <NumberField
+            label="Valor TP"
+            value={exitRules.take_profit_value}
+            onChange={(value) =>
+              setExitRules((prev) => ({ ...prev, take_profit_value: value }))
+            }
+            helper="Ratio riesgo/recompensa o porcentaje fijo de beneficio."
+          />
+        </div>
+      </section>
 
-      <SectionTitle number={4} title="Configuración Financiera" icon={<Wallet className="h-3.5 w-3.5 text-emerald-400" />} />
-      <div className="grid grid-cols-2 gap-3">
-        <NumberField
-          label="Capital inicial ($)"
-          value={initialCapital}
-          onChange={setInitialCapital}
-          min={1}
-        />
-        <NumberField
-          label="Comisión (%)"
-          value={commissionPct}
-          onChange={setCommissionPct}
-          min={0}
-          step={0.0001}
-        />
-        <NumberField
-          label="Slippage (%)"
-          value={slippagePct}
-          onChange={setSlippagePct}
-          min={0}
-          step={0.01}
-        />
-      </div>
+      <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <SectionTitle title="💰 Configuración Financiera" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <NumberField
+            label="Capital inicial ($)"
+            value={initialCapital}
+            onChange={setInitialCapital}
+            min={1}
+            helper="Dinero disponible para operar en la simulación."
+          />
+          <NumberField
+            label="Comisión (%)"
+            value={commissionPct}
+            onChange={setCommissionPct}
+            min={0}
+            step={0.0001}
+            helper="Comisión por operación sobre el volumen, en %."
+          />
+          <NumberField
+            label="Slippage (%)"
+            value={slippagePct}
+            onChange={setSlippagePct}
+            min={0}
+            step={0.01}
+            helper="Deslizamiento estimado entre el precio teórico y el de ejecución."
+          />
+        </div>
+      </section>
 
       <button
         onClick={handleSubmit}

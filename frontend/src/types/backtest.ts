@@ -55,3 +55,25 @@ export interface BacktestQueued {
   task_id: string;
   status: string;
 }
+
+export interface BacktestRun {
+  id: string;
+  symbol: string;
+  timeframe: string;
+  strategy_name: string;
+  metrics: BacktestMetrics;
+  created_at: string;
+}
+
+export interface BacktestDetail {
+  id: string;
+  symbol: string;
+  timeframe: string;
+  strategy_name: string;
+  created_at: string;
+  params: Record<string, number>;
+  exit_rules: ExitRules;
+  metrics: BacktestMetrics;
+  equity_curve: EquityPoint[];
+  trades: BacktestTrade[];
+}
