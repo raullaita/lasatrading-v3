@@ -26,10 +26,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-screen overflow-hidden bg-slate-950 text-slate-50">
+      <body className="flex h-screen overflow-hidden bg-slate-950 text-slate-50">
         <Sidebar />
-        <main className="ml-64 flex min-h-screen flex-1 flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-6">
+        <main className="ml-64 flex h-screen flex-1 flex-col overflow-hidden">
+          <div className="flex-1 p-6 overflow-y-auto overflow-x-hidden">
             {children}
           </div>
         </main>
