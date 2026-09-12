@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -10,6 +11,8 @@ from app.core.config import VALID_TIMEFRAMES
 from app.core.models import MonitorJob, UserStrategy
 from app.core.strategies.registry import registry
 from app.infra.db import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/portfolio", tags=["portfolio"])
 
@@ -111,6 +114,12 @@ def create_strategy(payload: StrategyCreate, db: Session = Depends(get_db)):
     db.add(item)
     db.commit()
     db.refresh(item)
+    logger.info(
+        "Estrategia '%s' creada para %s %s",
+        item.name,
+        item.symbol,
+        item.timeframe,
+    )
     return _to_dict(item)
 
 
@@ -140,6 +149,7 @@ def update_strategy(
     item.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(item)
+    logger.info("Estrategia %s actualizada (%s)", strategy_id, item.name)
     return _to_dict(item)
 
 
@@ -155,6 +165,7 @@ def delete_strategy(strategy_id: str, db: Session = Depends(get_db)) -> dict:
         db.delete(job)
     db.delete(item)
     db.commit()
+    logger.info("Estrategia eliminada ID: %s (%s)", strategy_id, item.name)
     return {"status": "deleted", "id": strategy_id}
 
 
@@ -163,6 +174,8 @@ def toggle_strategy(strategy_id: str, db: Session = Depends(get_db)) -> dict:
     item = _get_strategy_or_404(db, strategy_id)
     item.is_active = not item.is_active
     item.updated_at = datetime.now(timezone.utc)
+
+    logger.info("Estrategia ID %s %s", strategy_id, "activada" if item.is_active else "pausada")
 
     job = (
         db.execute(select(MonitorJob).where(MonitorJob.user_strategy_id == item.id))

@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime
 
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.core.models import Trade
 from app.infra.db import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/journal", tags=["journal"])
 
@@ -168,6 +171,13 @@ def create_trade(payload: TradeCreate, db: Session = Depends(get_db)) -> dict:
     db.add(item)
     db.commit()
     db.refresh(item)
+    logger.info(
+        "Trade registrado: %s %s (tipo: %s, status: %s)",
+        item.symbol,
+        item.direction,
+        item.trade_type,
+        item.status,
+    )
     return _to_dict(item)
 
 
@@ -217,14 +227,25 @@ def update_trade(
             item.pnl_net = computed
     db.commit()
     db.refresh(item)
+    if item.status == "closed":
+        logger.info("Trade cerrado: PnL %s", item.pnl_net)
+    else:
+        logger.info("Trade actualizado: %s %s (status: %s)", item.symbol, item.direction, item.status)
     return _to_dict(item)
 
 
 @router.delete("/trades/{trade_id}")
 def delete_trade(trade_id: str, db: Session = Depends(get_db)) -> dict:
+    logger.info("Eliminando trade ID: %s", trade_id)
     item = _get_trade_or_404(db, trade_id)
     db.delete(item)
     db.commit()
+    logger.info(
+        "Trade eliminado: %s %s (tipo: %s)",
+        item.symbol,
+        item.direction,
+        item.trade_type,
+    )
     return {"status": "deleted", "id": trade_id}
 
 

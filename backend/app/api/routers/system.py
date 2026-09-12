@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timezone
 
@@ -11,6 +12,8 @@ from app.infra.db import get_db
 from app.infra.telegram_client import send_telegram_message
 from app.services import config_service
 from app.services.health_service import check_system_health
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/system", tags=["system"])
 
@@ -66,12 +69,7 @@ def update_config(payload: ConfigUpdate, db: Session = Depends(get_db)) -> dict:
         str(key): value for key, value in payload.updates.items() if value is not None
     }
     config_service.set_configs(db, updates)
-    _write_log(
-        db,
-        "INFO",
-        "system",
-        f"Configuración actualizada: {', '.join(sorted(updates))}",
-    )
+    logger.info("Configuración actualizada: %s", ", ".join(sorted(updates)))
     return config_service.get_all_config(db)
 
 

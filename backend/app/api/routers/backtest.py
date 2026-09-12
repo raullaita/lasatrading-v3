@@ -59,11 +59,9 @@ def _execute_backtest(task_id: str, payload: BacktestRequest) -> None:
         )
         _BACKTEST_RESULTS[task_id] = {"status": "completed", **result}
         logger.info(
-            "Backtest completado: %s %s (estrategia %s, %d trades)",
-            payload.symbol,
-            payload.timeframe,
-            payload.strategy_name,
-            len(result["trades"]),
+            "Backtest completado: %s trades, PF: %s",
+            result["metrics"]["total_trades"],
+            result["metrics"]["profit_factor"],
         )
 
         db: Session = SessionLocal()
@@ -91,6 +89,12 @@ def _execute_backtest(task_id: str, payload: BacktestRequest) -> None:
 
 @router.post("/run", status_code=202)
 def run_backtest_endpoint(payload: BacktestRequest, background_tasks: BackgroundTasks):
+    logger.info(
+        "Iniciando backtest: %s %s con %s",
+        payload.symbol,
+        payload.timeframe,
+        payload.strategy_name,
+    )
     if payload.timeframe not in VALID_TIMEFRAMES:
         raise HTTPException(status_code=422, detail=f"Timeframe inválido: {payload.timeframe}")
     if registry.get_by_name(payload.strategy_name) is None:
@@ -175,6 +179,7 @@ def get_backtest_detail(backtest_id: str) -> dict:
 
 @router.delete("/{backtest_id}")
 def delete_backtest(backtest_id: str) -> dict:
+    logger.info("Eliminando backtest ID: %s", backtest_id)
     try:
         run_uuid = uuid.UUID(backtest_id)
     except ValueError as exc:
@@ -191,6 +196,7 @@ def delete_backtest(backtest_id: str) -> dict:
         db.close()
 
     _BACKTEST_RESULTS.pop(backtest_id, None)
+    logger.info("Backtest eliminado correctamente: %s", backtest_id)
     return {"status": "deleted", "id": backtest_id}
 
 

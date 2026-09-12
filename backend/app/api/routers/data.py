@@ -88,7 +88,7 @@ def _upsert_market_data_file(
 
 def _download_symbol_timeframe(
     db: Session, symbol: str, timeframe: str, start_date: str | None
-) -> None:
+) -> int:
     file_path = os.path.join(DATA_STORAGE_DIR, f"{symbol}_{timeframe}.parquet")
     metadata = get_parquet_metadata(file_path)
 
@@ -99,13 +99,14 @@ def _download_symbol_timeframe(
             datetime.now(timezone.utc) - timedelta(days=365)
         )
 
+    total_appended = 0
     while True:
         candles = fetch_klines(
             symbol, timeframe, start_time=int(start_dt.timestamp() * 1000), limit=1000
         )
         if not candles:
             break
-        append_candles(file_path, candles)
+        total_appended += append_candles(file_path, candles)
         if len(candles) < 1000:
             break
         start_dt = candles[-1]["timestamp"] + timedelta(milliseconds=1)
@@ -121,6 +122,7 @@ def _download_symbol_timeframe(
         metadata["row_count"],
         file_path,
     )
+    return total_appended
 
 
 def _run_historical_import(
@@ -132,17 +134,19 @@ def _run_historical_import(
     done = 0
 
     db = SessionLocal()
+    total_appended = 0
     try:
         for symbol in symbols:
             for timeframe in timeframes:
                 try:
-                    _download_symbol_timeframe(db, symbol, timeframe, start_date)
+                    total_appended += _download_symbol_timeframe(db, symbol, timeframe, start_date)
                 except Exception as exc:
                     task["errors"].append(f"{symbol} {timeframe}: {exc}")
                     logger.error("Import fallido para %s %s: %s", symbol, timeframe, exc)
                 done += 1
                 task["progress"] = round(done / total * 100)
         task["status"] = "done"
+        logger.info("Importación completada: %d velas añadidas", total_appended)
     finally:
         db.close()
 
@@ -181,6 +185,7 @@ def data_status(db: Session = Depends(get_db)):
 
 @router.delete("/{file_id}")
 def delete_file(file_id: str, db: Session = Depends(get_db)):
+    logger.info("Eliminando archivo de datos ID: %s", file_id)
     file_record = db.execute(
         select(MarketDataFile).where(MarketDataFile.id == file_id)
     ).scalar_one_or_none()
@@ -194,14 +199,24 @@ def delete_file(file_id: str, db: Session = Depends(get_db)):
     except Exception as exc:
         logger.warning("No se pudo eliminar el archivo en disco: %s", exc)
 
-    db.delete(file_record)
-    db.commit()
+    try:
+        db.delete(file_record)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error("Error al eliminar archivo %s: %s", file_id, exc)
+        raise HTTPException(status_code=500, detail="Error al eliminar el archivo") from exc
+
+    logger.info(
+        "Archivo eliminado correctamente: %s %s", file_record.symbol, file_record.timeframe
+    )
 
     return {"message": "Archivo eliminado correctamente"}
 
 
 @router.post("/{file_id}/refresh")
 def refresh_file(file_id: str, db: Session = Depends(get_db)):
+    logger.info("Actualizando archivo ID: %s", file_id)
     file_record = db.execute(
         select(MarketDataFile).where(MarketDataFile.id == file_id)
     ).scalar_one_or_none()
@@ -241,7 +256,7 @@ def refresh_file(file_id: str, db: Session = Depends(get_db)):
     db.commit()
 
     logger.info(
-        "Refresh completado: %s %s (%d velas nuevas)",
+        "Archivo actualizado: %s %s (%d velas nuevas añadidas)",
         symbol,
         timeframe,
         new_candles,
@@ -252,6 +267,12 @@ def refresh_file(file_id: str, db: Session = Depends(get_db)):
 
 @router.post("/import", status_code=202)
 def import_data(payload: ImportRequest, background_tasks: BackgroundTasks):
+    logger.info(
+        "Iniciando importación: %s %s desde %s",
+        payload.symbols,
+        payload.timeframes,
+        payload.start_date,
+    )
     for timeframe in payload.timeframes:
         if timeframe not in VALID_TIMEFRAMES:
             raise HTTPException(status_code=422, detail=f"Timeframe inválido: {timeframe}")

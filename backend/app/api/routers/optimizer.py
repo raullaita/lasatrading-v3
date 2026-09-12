@@ -1,3 +1,4 @@
+import logging
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -7,6 +8,8 @@ from app.core.config import DATA_STORAGE_DIR, VALID_TIMEFRAMES
 from app.core.strategies.registry import registry
 from app.infra.parquet_utils import load_parquet
 from app.services import optimizer_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/optimizer", tags=["optimizer"])
 
@@ -58,6 +61,12 @@ def _count_combinations(param_ranges: dict[str, ParamRange]) -> int:
 
 @router.post("/run", status_code=202)
 def run_optimization(payload: OptimizationRequest):
+    logger.info(
+        "Iniciando optimización: %s %s con %s",
+        payload.symbol,
+        payload.timeframe,
+        payload.strategy_name,
+    )
     if payload.timeframe not in VALID_TIMEFRAMES:
         raise HTTPException(status_code=422, detail=f"Timeframe inválido: {payload.timeframe}")
     if registry.get_by_name(payload.strategy_name) is None:
@@ -104,6 +113,12 @@ def run_optimization(payload: OptimizationRequest):
         timeframe=payload.timeframe,
         strategy_name=payload.strategy_name,
     )
+    logger.info(
+        "Optimización encolada: %s (%d combinaciones), task %s",
+        payload.strategy_name,
+        total_combinations,
+        task_id,
+    )
     return {"task_id": task_id, "status": "queued", "total_combinations": total_combinations}
 
 
@@ -117,6 +132,7 @@ def get_task_status(task_id: str):
 
 @router.post("/cancel/{task_id}")
 def cancel_task(task_id: str):
+    logger.info("Cancelando optimización task ID: %s", task_id)
     cancelled = optimizer_service.cancel_task(task_id)
     if not cancelled:
         raise HTTPException(status_code=404, detail="Tarea no encontrada o no en ejecución")

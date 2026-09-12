@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.core.models import MonitorJob, PriceAlert, SignalLog, UserStrategy
 from app.infra.db import get_db
 from app.infra.telegram_client import send_telegram_message
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/monitor", tags=["monitor"])
 
@@ -120,6 +123,11 @@ def create_job(payload: dict, db: Session = Depends(get_db)):
     db.add(job)
     db.commit()
     db.refresh(job)
+    logger.info(
+        "Job de monitor creado para estrategia %s (%s)",
+        strategy.name,
+        strategy_id,
+    )
     return _job_to_dict(job)
 
 
@@ -161,14 +169,27 @@ def create_price_alert(payload: PriceAlertCreate, db: Session = Depends(get_db))
     db.add(alert)
     db.commit()
     db.refresh(alert)
+    logger.info(
+        "Alerta de precio creada: %s %s %s",
+        alert.symbol,
+        alert.condition,
+        alert.target_price,
+    )
     return _alert_to_dict(alert)
 
 
 @router.delete("/price-alerts/{alert_id}")
 def delete_price_alert(alert_id: str, db: Session = Depends(get_db)) -> dict:
+    logger.info("Eliminando alerta de precio ID: %s", alert_id)
     item = _get_alert_or_404(db, alert_id)
     db.delete(item)
     db.commit()
+    logger.info(
+        "Alerta de precio eliminada: %s %s %s",
+        item.symbol,
+        item.condition,
+        item.target_price,
+    )
     return {"status": "deleted", "id": alert_id}
 
 
