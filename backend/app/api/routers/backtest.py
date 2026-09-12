@@ -1,15 +1,21 @@
+import logging
 import os
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.core.backtest_engine import run_backtest
 from app.core.config import DATA_STORAGE_DIR, VALID_TIMEFRAMES
+from app.core.models import BacktestRun
 from app.core.strategies.registry import registry
+from app.infra.db import SessionLocal
 from app.infra.parquet_utils import load_parquet
 
 router = APIRouter(prefix="/api/v1/backtest", tags=["backtest"])
+
+logger = logging.getLogger(__name__)
 
 _BACKTEST_RESULTS: dict[str, dict] = {}
 
@@ -51,6 +57,33 @@ def _execute_backtest(task_id: str, payload: BacktestRequest) -> None:
             payload.slippage_pct,
         )
         _BACKTEST_RESULTS[task_id] = {"status": "completed", **result}
+        logger.info(
+            "Backtest completado: %s %s (estrategia %s, %d trades)",
+            payload.symbol,
+            payload.timeframe,
+            payload.strategy_name,
+            len(result["trades"]),
+        )
+
+        db: Session = SessionLocal()
+        try:
+            existing = db.get(BacktestRun, uuid.UUID(task_id))
+            run = existing or BacktestRun(id=uuid.UUID(task_id))
+            run.symbol = payload.symbol
+            run.timeframe = payload.timeframe
+            run.strategy_name = payload.strategy_name
+            run.params = payload.strategy_params
+            run.exit_rules = payload.exit_rules.model_dump()
+            run.metrics = result["metrics"]
+            run.equity_curve = result["equity_curve"]
+            run.trades = result["trades"]
+            db.add(run)
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.error("No se pudo persistir el backtest %s: %s", task_id, exc)
+        finally:
+            db.close()
     except Exception as exc:
         _BACKTEST_RESULTS[task_id] = {"status": "error", "detail": str(exc)}
 
@@ -83,6 +116,25 @@ def run_backtest_endpoint(payload: BacktestRequest, background_tasks: Background
 @router.get("/results/{task_id}")
 def get_backtest_results(task_id: str):
     result = _BACKTEST_RESULTS.get(task_id)
-    if result is None:
+    if result is not None:
+        return result
+
+    try:
+        task_uuid = uuid.UUID(task_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Backtest no encontrado") from exc
+
+    db: Session = SessionLocal()
+    try:
+        run = db.get(BacktestRun, task_uuid)
+    finally:
+        db.close()
+
+    if run is None:
         raise HTTPException(status_code=404, detail="Backtest no encontrado")
-    return result
+    return {
+        "status": "completed",
+        "metrics": run.metrics,
+        "equity_curve": run.equity_curve,
+        "trades": run.trades,
+    }

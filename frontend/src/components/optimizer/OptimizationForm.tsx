@@ -11,7 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 
-import { getStrategiesCatalog } from "@/lib/api";
+import { getDataStatus, getStrategiesCatalog } from "@/lib/api";
 import type { ExitRules } from "@/types/backtest";
 import type {
   OptimizationRequest,
@@ -22,8 +22,6 @@ import type {
   StrategyCatalogItem,
 } from "@/types/strategies";
 
-const SYMBOLS = ["BTCUSDT", "ETHUSDT", "XRPUSDT"];
-const TIMEFRAMES = ["15m", "1h", "4h"];
 const MAX_COMBINATIONS = 10000;
 
 const SL_TYPES = [
@@ -147,8 +145,13 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
   const [strategiesLoading, setStrategiesLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
-  const [symbol, setSymbol] = useState(SYMBOLS[0]);
-  const [timeframe, setTimeframe] = useState(TIMEFRAMES[0]);
+  const [symbols, setSymbols] = useState<string[]>([]);
+  const [timeframes, setTimeframes] = useState<string[]>([]);
+  const [symbolsLoading, setSymbolsLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+
+  const [symbol, setSymbol] = useState("");
+  const [timeframe, setTimeframe] = useState("");
 
   const [strategyName, setStrategyName] = useState("");
   const [paramRanges, setParamRanges] = useState<Record<string, ParamRangeSpec>>({});
@@ -191,6 +194,19 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
           setCatalogError("No se pudo cargar el catálogo de estrategias.");
         })
         .finally(() => setStrategiesLoading(false));
+      void getDataStatus()
+        .then((data) => {
+          const nextSymbols = [...new Set(data.map((d) => d.symbol))];
+          const nextTimeframes = [...new Set(data.map((d) => d.timeframe))];
+          setSymbols(nextSymbols);
+          setTimeframes(nextTimeframes);
+          if (nextSymbols.length > 0) setSymbol(nextSymbols[0]);
+          if (nextTimeframes.length > 0) setTimeframe(nextTimeframes[0]);
+        })
+        .catch(() => {
+          setDataError("No se pudieron cargar los datos importados.");
+        })
+        .finally(() => setSymbolsLoading(false));
     }, 0);
     return () => clearTimeout(initial);
   }, []);
@@ -231,7 +247,7 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
   };
 
   const handleSubmit = () => {
-    if (!strategyName || !selectedStrategy) return;
+    if (!strategyName || !selectedStrategy || !symbol || !timeframe) return;
     onRun({
       symbol: symbol.toUpperCase(),
       timeframe,
@@ -254,18 +270,30 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
   return (
     <div className="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-5">
       <SectionTitle number={1} title="Datos" icon={<Settings2 className="h-3.5 w-3.5 text-emerald-400" />} />
+      {dataError && (
+        <p className="mb-2 text-xs text-red-400" role="alert">
+          {dataError}
+        </p>
+      )}
+      {!dataError && !symbolsLoading && symbols.length === 0 && (
+        <p className="mb-2 text-xs text-yellow-400">
+          No hay datos importados. Ve al Módulo de Datos para importar.
+        </p>
+      )}
       <div className="space-y-3">
         <SelectField
           label="Símbolo"
           value={symbol}
           onChange={setSymbol}
-          options={SYMBOLS.map((s) => ({ value: s, label: s }))}
+          disabled={symbolsLoading || symbols.length === 0}
+          options={symbols.map((s) => ({ value: s, label: s }))}
         />
         <SelectField
           label="Timeframe"
           value={timeframe}
           onChange={setTimeframe}
-          options={TIMEFRAMES.map((t) => ({ value: t, label: t }))}
+          disabled={symbolsLoading || timeframes.length === 0}
+          options={timeframes.map((t) => ({ value: t, label: t }))}
         />
       </div>
 
@@ -454,7 +482,7 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
 
       <button
         onClick={handleSubmit}
-        disabled={running || !strategyName || exceedsLimit}
+        disabled={running || !strategyName || !symbol || !timeframe || exceedsLimit}
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {running ? (

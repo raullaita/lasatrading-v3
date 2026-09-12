@@ -165,6 +165,44 @@ class SystemLog(Base):
     details: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
+class BacktestRun(Base):
+    __tablename__ = "backtest_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False)
+    timeframe: Mapped[str] = mapped_column(String(10), nullable=False)
+    strategy_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    params: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    exit_rules: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    equity_curve: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    trades: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class OptimizationRun(Base):
+    __tablename__ = "optimization_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False)
+    timeframe: Mapped[str] = mapped_column(String(10), nullable=False)
+    strategy_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    param_ranges: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    oos_config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    candidates: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    total_combinations: Mapped[int] = mapped_column(Integer, default=0)
+    completed_combinations: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class Trade(Base):
     __tablename__ = "trades"
 

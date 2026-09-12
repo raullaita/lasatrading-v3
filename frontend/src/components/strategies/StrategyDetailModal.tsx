@@ -1,7 +1,8 @@
 "use client";
 
-import { Info, X } from "lucide-react";
+import { BarChart3, Info, X } from "lucide-react";
 
+import MockStrategyChart from "@/components/strategies/MockStrategyChart";
 import type {
   ParameterSchema,
   StrategyCatalogItem,
@@ -65,6 +66,23 @@ export default function StrategyDetailModal({
           >
             <X className="h-4 w-4" />
           </button>
+        </div>
+
+        <div className="px-6 py-5">
+          <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
+            <BarChart3 className="h-3.5 w-3.5 text-emerald-400" />
+            Ejemplo Visual
+          </h3>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+            <MockStrategyChart strategyName={strategy.name} />
+            <p className="mt-3 text-[11px] text-slate-500">
+              Datos simulados para ilustrar el comportamiento de la estrategia: la
+              línea muestra el precio y las flechas {"\u2191"}{" "}
+              <span className="text-emerald-400">entradas</span> /{" "}
+              {"\u2193"}{" "}
+              <span className="text-red-400">salidas</span>.
+            </p>
+          </div>
         </div>
 
         <div className="px-6 py-5">

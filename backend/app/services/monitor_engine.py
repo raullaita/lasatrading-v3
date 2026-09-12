@@ -63,6 +63,15 @@ def evaluate_job(job: MonitorJob, strategy: UserStrategy, db: Session) -> None:
         signal_type = "buy"
         emoji = "\U0001f6a8"
 
+        logger.info(
+            "Señal BUY detectada: %s %s (estrategia %s) precio=%.4f en vela %s",
+            strategy.symbol,
+            strategy.timeframe,
+            strategy.name,
+            last_closed["close"],
+            candle_ts.isoformat(),
+        )
+
         log_entry = SignalLog(
             job_id=job.id,
             symbol=strategy.symbol,
@@ -83,6 +92,11 @@ def evaluate_job(job: MonitorJob, strategy: UserStrategy, db: Session) -> None:
         )
         sent = send_telegram_message(msg)
         log_entry.telegram_sent = sent
+        logger.info(
+            "Notificación Telegram para %s: %s",
+            strategy.symbol,
+            "enviada" if sent else "fallida",
+        )
 
         job.last_signal_at = now
 

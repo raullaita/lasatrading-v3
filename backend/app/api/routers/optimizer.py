@@ -100,6 +100,9 @@ def run_optimization(payload: OptimizationRequest):
         payload.initial_capital,
         payload.commission_pct,
         payload.slippage_pct,
+        symbol=payload.symbol,
+        timeframe=payload.timeframe,
+        strategy_name=payload.strategy_name,
     )
     return {"task_id": task_id, "status": "queued", "total_combinations": total_combinations}
 
@@ -123,12 +126,16 @@ def cancel_task(task_id: str):
 @router.get("/results/{task_id}")
 def get_task_results(task_id: str):
     status = optimizer_service.get_task_status(task_id)
-    if status is None:
+    if status is not None:
+        if status["status"] != "completed":
+            raise HTTPException(status_code=404, detail=f"La optimización aún no está completada (status: {status['status']})")
+        result = optimizer_service.get_task_results(task_id)
+        if result is None:
+            raise HTTPException(status_code=500, detail="Resultado no disponible")
+        result["completed_combinations"] = result.get("completed", 0)
+        return result
+
+    persisted = optimizer_service.get_persisted_result(task_id)
+    if persisted is None:
         raise HTTPException(status_code=404, detail="Tarea de optimización no encontrada")
-    if status["status"] != "completed":
-        raise HTTPException(status_code=404, detail=f"La optimización aún no está completada (status: {status['status']})")
-    result = optimizer_service.get_task_results(task_id)
-    if result is None:
-        raise HTTPException(status_code=500, detail="Resultado no disponible")
-    result["completed_combinations"] = result.get("completed", 0)
-    return result
+    return {"status": "completed", **persisted}

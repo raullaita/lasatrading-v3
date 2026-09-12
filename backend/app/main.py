@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,12 +19,34 @@ from app.api.routers import (
 from app.core.models import Base
 from app.core.strategies.registry import registry
 from app.infra.db import engine
+from app.infra.db_log_handler import DatabaseLogHandler
 from app.services.task_manager import start_task_manager, stop_task_manager
+
+
+def _configure_logging() -> None:
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    if not any(isinstance(h, DatabaseLogHandler) for h in root.handlers):
+        db_handler = DatabaseLogHandler()
+        db_handler.setLevel(logging.INFO)
+        root.addHandler(db_handler)
+
+    if not any(isinstance(h, logging.StreamHandler) for h in root.handlers):
+        stream = logging.StreamHandler()
+        stream.setLevel(logging.INFO)
+        stream.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        )
+        root.addHandler(stream)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _configure_logging()
     Base.metadata.create_all(bind=engine)
+    root_logger = logging.getLogger("app")
+    root_logger.info("Iniciando LasaTrading API v3.0")
     start_task_manager()
     yield
     stop_task_manager()

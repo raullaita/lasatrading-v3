@@ -5,8 +5,10 @@ from typing import Any
 
 import pandas as pd
 
+from app.core.models import OptimizationRun
 from app.core.optimizer_engine import run_optimization
 from app.core.strategies.base import BaseStrategy
+from app.infra.db import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,9 @@ def start_optimization_task(
     initial_capital: float,
     commission_pct: float,
     slippage_pct: float,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    strategy_name: str | None = None,
 ) -> str:
     task_id = str(uuid.uuid4())
 
@@ -87,9 +92,23 @@ def start_optimization_task(
                 task["result"] = result
                 task["completed_combinations"] = result["completed"]
                 task["progress_pct"] = 100.0
+                logger.info(
+                    "Optimización completada: %s candidatos en %d combinaciones",
+                    len(result.get("candidates", [])),
+                    result.get("total_combinations", 0),
+                )
                 if result["candidates"]:
                     sorted_cands = sorted(result["candidates"], key=lambda c: c.get("oos_metrics", {}).get("profit_factor") or 0, reverse=True)
                     task["top_candidates_partial"] = sorted_cands[:3]
+                _persist_optimization_run(
+                    task_id,
+                    result,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    strategy_name=strategy_name,
+                    param_ranges_raw=param_ranges_raw,
+                    oos_config=oos_config,
+                )
         except Exception as exc:
             task["status"] = "failed"
             task["error"] = str(exc)
@@ -98,6 +117,56 @@ def start_optimization_task(
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     return task_id
+
+
+def _persist_optimization_run(
+    task_id: str,
+    result: dict,
+    symbol: str | None,
+    timeframe: str | None,
+    strategy_name: str | None,
+    param_ranges_raw: dict,
+    oos_config: dict,
+) -> None:
+    try:
+        db = SessionLocal()
+        try:
+            existing = db.get(OptimizationRun, uuid.UUID(task_id))
+            run = existing or OptimizationRun(id=uuid.UUID(task_id))
+            run.symbol = symbol or ""
+            run.timeframe = timeframe or ""
+            run.strategy_name = strategy_name or ""
+            run.param_ranges = param_ranges_raw
+            run.oos_config = oos_config
+            run.candidates = result.get("candidates", [])
+            run.total_combinations = result.get("total_combinations", 0)
+            run.completed_combinations = result.get("completed", 0)
+            db.add(run)
+            db.commit()
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("No se pudo persistir la optimización %s: %s", task_id, exc)
+
+
+def get_persisted_result(task_id: str) -> dict | None:
+    try:
+        db = SessionLocal()
+        try:
+            run = db.get(OptimizationRun, uuid.UUID(task_id))
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("No se pudo leer la optimización %s de BD: %s", task_id, exc)
+        return None
+
+    if run is None:
+        return None
+    return {
+        "candidates": run.candidates,
+        "total_combinations": run.total_combinations,
+        "completed_combinations": run.completed_combinations,
+    }
 
 
 def get_task_status(task_id: str) -> dict | None:
