@@ -23,6 +23,27 @@ function formatDate(iso: string | null): string {
   });
 }
 
+type SortColumn =
+  | "symbol"
+  | "timeframe"
+  | "row_count"
+  | "last_candle_at"
+  | "file_size_mb"
+  | "freshness_status";
+
+function compareValues(
+  aVal: string | number | null,
+  bVal: string | number | null
+): number {
+  if (aVal === bVal) return 0;
+  if (aVal === null) return -1;
+  if (bVal === null) return 1;
+  if (typeof aVal === "number" && typeof bVal === "number") {
+    return aVal - bVal;
+  }
+  return String(aVal) < String(bVal) ? -1 : 1;
+}
+
 export default function DataPage() {
   const [files, setFiles] = useState<MarketDataFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +53,25 @@ export default function DataPage() {
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortedData = () => {
+    if (!sortColumn) return files;
+    return [...files].sort((a, b) => {
+      const result = compareValues(a[sortColumn], b[sortColumn]);
+      return sortDirection === "asc" ? result : -result;
+    });
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -191,17 +231,42 @@ export default function DataPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-800 text-xs uppercase tracking-wide text-slate-400">
-                  <th className="px-5 py-3 font-medium">Símbolo</th>
-                  <th className="px-5 py-3 font-medium">Timeframe</th>
-                  <th className="px-5 py-3 font-medium">Nº Velas</th>
-                  <th className="px-5 py-3 font-medium">Última Vela</th>
-                  <th className="px-5 py-3 font-medium">Tamaño</th>
-                  <th className="px-5 py-3 font-medium">Estado</th>
+                  {[
+                    { key: "symbol" as const, label: "Símbolo" },
+                    { key: "timeframe" as const, label: "Timeframe" },
+                    { key: "row_count" as const, label: "Nº Velas" },
+                    { key: "last_candle_at" as const, label: "Última Vela" },
+                    { key: "file_size_mb" as const, label: "Tamaño" },
+                    { key: "freshness_status" as const, label: "Estado" },
+                  ].map(({ key, label }) => (
+                    <th
+                      key={key}
+                      onClick={() => handleSort(key)}
+                      className="select-none cursor-pointer px-5 py-3 font-medium transition-colors hover:bg-slate-800"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {label}
+                        <span
+                          className={
+                            sortColumn === key
+                              ? "text-slate-100"
+                              : "text-slate-600"
+                          }
+                        >
+                          {sortColumn === key
+                            ? sortDirection === "asc"
+                              ? "↑"
+                              : "↓"
+                            : "↕"}
+                        </span>
+                      </span>
+                    </th>
+                  ))}
                   <th className="px-5 py-3 text-right font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {files.map((file) => (
+                {getSortedData().map((file) => (
                   <tr
                     key={file.id}
                     className="border-b border-slate-800/60 last:border-b-0 hover:bg-slate-800/40"
