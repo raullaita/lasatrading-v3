@@ -15,7 +15,9 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
+import { toast } from "sonner";
 
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import {
   createPriceAlert,
@@ -59,6 +61,9 @@ export default function MonitorPage() {
   const [alertCondition, setAlertCondition] = useState<">" | "<">(">");
   const [alertPrice, setAlertPrice] = useState("");
   const [creatingAlert, setCreatingAlert] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<PriceAlert | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [telegramState, setTelegramState] = useState<
     "idle" | "testing" | "success" | "unconfigured" | "error"
@@ -138,6 +143,7 @@ export default function MonitorPage() {
       setAlertSymbol("");
       setAlertPrice("");
       setAlertCondition(">");
+      toast.success("Alerta de precio creada correctamente");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la alerta.");
     } finally {
@@ -145,12 +151,19 @@ export default function MonitorPage() {
     }
   };
 
-  const handleDeleteAlert = async (id: string) => {
+  const handleDeleteAlert = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError(null);
     try {
-      await deletePriceAlert(id);
-      setAlerts((prev) => prev.filter((a) => a.id !== id));
+      await deletePriceAlert(deleteTarget.id);
+      setAlerts((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+      toast.success("Alerta eliminada");
+      setDeleteTarget(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo borrar la alerta.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -158,10 +171,17 @@ export default function MonitorPage() {
     setTelegramState("testing");
     try {
       const result = await testTelegram();
-      setTelegramState(result.sent ? "success" : "unconfigured");
+      if (result.sent) {
+        setTelegramState("success");
+        toast.success("Mensaje de prueba enviado a Telegram");
+      } else {
+        setTelegramState("unconfigured");
+        toast.error("Error: Telegram no configurado o fallo en el envío");
+      }
       setError(null);
     } catch (err) {
       setTelegramState("error");
+      toast.error("Error: Telegram no configurado o fallo en el envío");
       setError(
         err instanceof Error ? err.message : "No se pudo enviar el mensaje de prueba."
       );
@@ -229,23 +249,6 @@ export default function MonitorPage() {
           Probar Telegram
         </button>
       </header>
-
-      {telegramState === "success" && (
-        <div
-          className="mb-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-4 text-sm text-emerald-400"
-          role="status"
-        >
-          Telegram conectado correctamente. Mensaje de prueba enviado.
-        </div>
-      )}
-      {telegramState === "unconfigured" && (
-        <div
-          className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-400"
-          role="status"
-        >
-          Telegram no configurado: define TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID en el .env.
-        </div>
-      )}
 
       {error && (
         <div
@@ -420,9 +423,9 @@ export default function MonitorPage() {
                       ) : null}
                       <button
                         onClick={() => handleRegisterInJournal(signal)}
-                        className="mt-1 rounded-md border border-slate-700 px-2 py-1 text-[10px] font-medium text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                        className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-400 transition hover:bg-emerald-500/20 hover:text-emerald-300"
                       >
-                        Registrar en Journal
+                        📓 Registrar en Journal
                       </button>
                     </div>
                   </li>
@@ -524,7 +527,7 @@ export default function MonitorPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => void handleDeleteAlert(alert.id)}
+                  onClick={() => setDeleteTarget(alert)}
                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition hover:border-red-500/40 hover:text-red-400"
                   aria-label={`Eliminar alerta de ${alert.symbol}`}
                 >
@@ -535,6 +538,19 @@ export default function MonitorPage() {
           </ul>
         )}
       </section>
+
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        title="Eliminar alerta"
+        message={
+          deleteTarget
+            ? `¿Seguro que quieres eliminar la alerta de ${deleteTarget.symbol}? Esta acción no se puede deshacer.`
+            : ""
+        }
+        onConfirm={() => void handleDeleteAlert()}
+        onCancel={() => setDeleteTarget(null)}
+        isLoading={deleting}
+      />
     </main>
   );
 }
