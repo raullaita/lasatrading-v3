@@ -72,3 +72,28 @@ export interface OptimizationResult {
   total_combinations: number;
   completed_combinations: number;
 }
+
+export interface OptimizationRun {
+  id: string;
+  symbol: string;
+  timeframe: string;
+  strategy_name: string;
+  total_combinations: number;
+  robust_count: number;
+  best_pf_oos: number | null;
+  created_at: string;
+}
+
+export interface OptimizationDetail extends OptimizationResult {
+  id: string;
+  symbol: string;
+  timeframe: string;
+  strategy_name: string;
+  param_ranges: Record<string, ParamRangeSpec>;
+  oos_config: OOSConfig;
+  exit_rules: ExitRules;
+  initial_capital: number;
+  commission_pct: number;
+  slippage_pct: number;
+  created_at: string;
+}

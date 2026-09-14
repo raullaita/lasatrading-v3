@@ -8,9 +8,11 @@ import type {
 } from "@/types/backtest";
 import type { StrategyCatalogItem } from "@/types/strategies";
 import type {
+  OptimizationDetail,
   OptimizationQueued,
   OptimizationRequest,
   OptimizationResult,
+  OptimizationRun,
   OptimizationStatusResponse,
 } from "@/types/optimizer";
 import type {
@@ -177,6 +179,31 @@ export function getOptimizationResults(
   taskId: string
 ): Promise<OptimizationResult> {
   return request<OptimizationResult>(`/api/v1/optimizer/results/${taskId}`);
+}
+
+export function getOptimizationHistory(
+  filters: {
+    strategy_name?: string;
+    symbol?: string;
+    limit?: number;
+    offset?: number;
+  } = {}
+): Promise<OptimizationRun[]> {
+  return request<OptimizationRun[]>(
+    `/api/v1/optimizer/history${buildQuery(filters)}`
+  );
+}
+
+export function getOptimizationDetail(id: string): Promise<OptimizationDetail> {
+  return request<OptimizationDetail>(`/api/v1/optimizer/${id}`);
+}
+
+export function deleteOptimization(
+  id: string
+): Promise<{ status: string; id: string }> {
+  return request<{ status: string; id: string }>(`/api/v1/optimizer/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export function getStrategies(

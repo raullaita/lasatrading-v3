@@ -1,15 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  Cpu,
-  Loader2,
-  Settings2,
-  ShieldCheck,
-  SlidersHorizontal,
-  TrendingDown,
-  Wallet,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, SlidersHorizontal } from "lucide-react";
 
 import { getDataStatus, getStrategiesCatalog } from "@/lib/api";
 import type { ExitRules } from "@/types/backtest";
@@ -34,27 +26,23 @@ const TP_TYPES = [
   { value: "fixed_percent", label: "% fijo", step: 0.01 },
 ];
 
+const DEFAULT_EXIT_RULES: ExitRules = {
+  stop_loss_type: "atr_multiplier",
+  stop_loss_value: 1.5,
+  take_profit_type: "risk_reward_ratio",
+  take_profit_value: 2.0,
+};
+
 interface OptimizationFormProps {
   running: boolean;
   onRun: (request: OptimizationRequest) => void;
+  initial?: Partial<OptimizationRequest>;
 }
 
-function SectionTitle({
-  number,
-  title,
-  icon,
-}: {
-  number: number;
-  title: string;
-  icon: ReactNode;
-}) {
+function SectionTitle({ title }: { title: string }) {
   return (
-    <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
-      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-emerald-400">
-        {number}
-      </span>
-      {icon}
-      {title}
+    <h2 className="text-sm font-semibold text-slate-100">
+      <span>{title}</span>
     </h2>
   );
 }
@@ -101,12 +89,14 @@ function SelectField({
   onChange,
   options,
   disabled = false,
+  helper,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
   disabled?: boolean;
+  helper?: string;
 }) {
   return (
     <div>
@@ -125,6 +115,7 @@ function SelectField({
           </option>
         ))}
       </select>
+      {helper && <p className="mt-1 text-[11px] text-slate-500">{helper}</p>}
     </div>
   );
 }
@@ -140,7 +131,20 @@ function defaultRange(
   return { type: "int", min, max, step };
 }
 
-export default function OptimizationForm({ running, onRun }: OptimizationFormProps) {
+function defaultsForStrategy(strategy: StrategyCatalogItem): Record<string, ParamRangeSpec> {
+  return Object.fromEntries(
+    Object.entries(strategy.parameters_schema).map(([key, schema]) => [
+      key,
+      defaultRange(key, schema),
+    ])
+  );
+}
+
+export default function OptimizationForm({
+  running,
+  onRun,
+  initial,
+}: OptimizationFormProps) {
   const [catalog, setCatalog] = useState<StrategyCatalogItem[]>([]);
   const [strategiesLoading, setStrategiesLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -150,44 +154,59 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
   const [symbolsLoading, setSymbolsLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
 
-  const [symbol, setSymbol] = useState("");
-  const [timeframe, setTimeframe] = useState("");
+  const [symbol, setSymbol] = useState(initial?.symbol ?? "");
+  const [timeframe, setTimeframe] = useState(initial?.timeframe ?? "");
 
-  const [strategyName, setStrategyName] = useState("");
-  const [paramRanges, setParamRanges] = useState<Record<string, ParamRangeSpec>>({});
+  const [strategyName, setStrategyName] = useState(
+    initial?.strategy_name ?? ""
+  );
+  const [paramRanges, setParamRanges] = useState<Record<string, ParamRangeSpec>>(
+    initial?.param_ranges ?? {}
+  );
 
-  const [oosEnabled, setOosEnabled] = useState(true);
-  const [splitRatio, setSplitRatio] = useState(0.7);
-  const [oosMinPf, setOosMinPf] = useState(1.3);
-  const [oosMaxDegradation, setOosMaxDegradation] = useState(0.3);
-  const [minTrades, setMinTrades] = useState(10);
+  const [oosEnabled, setOosEnabled] = useState(
+    initial?.oos_config?.enabled ?? true
+  );
+  const [splitRatio, setSplitRatio] = useState(
+    initial?.oos_config?.split_ratio ?? 0.7
+  );
+  const [oosMinPf, setOosMinPf] = useState(
+    initial?.oos_config?.min_pf ?? 1.3
+  );
+  const [oosMaxDegradation, setOosMaxDegradation] = useState(
+    initial?.oos_config?.max_degradation ?? 0.3
+  );
+  const [minTrades, setMinTrades] = useState(
+    initial?.oos_config?.min_trades ?? 10
+  );
 
-  const [exitRules, setExitRules] = useState<ExitRules>({
-    stop_loss_type: "atr_multiplier",
-    stop_loss_value: 1.5,
-    take_profit_type: "risk_reward_ratio",
-    take_profit_value: 2.0,
-  });
+  const [exitRules, setExitRules] = useState<ExitRules>(
+    initial?.exit_rules && Object.keys(initial.exit_rules).length > 0
+      ? initial.exit_rules
+      : DEFAULT_EXIT_RULES
+  );
 
-  const [initialCapital, setInitialCapital] = useState(10000);
-  const [commissionPct, setCommissionPct] = useState(0.001);
-  const [slippagePct, setSlippagePct] = useState(0.1);
+  const [initialCapital, setInitialCapital] = useState(
+    initial?.initial_capital ?? 10000
+  );
+  const [commissionPct, setCommissionPct] = useState(
+    initial?.commission_pct ?? 0.001
+  );
+  const [slippagePct, setSlippagePct] = useState(initial?.slippage_pct ?? 0.1);
+
+  const hasPrefill =
+    Boolean(initial?.strategy_name) &&
+    Object.keys(initial?.param_ranges ?? {}).length > 0;
 
   useEffect(() => {
-    const initial = setTimeout(() => {
+    const timer = setTimeout(() => {
       void getStrategiesCatalog()
         .then((items) => {
           setCatalog(items);
-          if (items.length > 0) {
-            setStrategyName(items[0].name);
-            setParamRanges(
-              Object.fromEntries(
-                Object.entries(items[0].parameters_schema).map(([key, schema]) => [
-                  key,
-                  defaultRange(key, schema),
-                ])
-              )
-            );
+          if (items.length > 0 && !hasPrefill) {
+            const first = items[0];
+            setStrategyName(first.name);
+            setParamRanges(defaultsForStrategy(first));
           }
         })
         .catch(() => {
@@ -200,15 +219,17 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
           const nextTimeframes = [...new Set(data.map((d) => d.timeframe))];
           setSymbols(nextSymbols);
           setTimeframes(nextTimeframes);
-          if (nextSymbols.length > 0) setSymbol(nextSymbols[0]);
-          if (nextTimeframes.length > 0) setTimeframe(nextTimeframes[0]);
+          if (symbol === "" && nextSymbols.length > 0) setSymbol(nextSymbols[0]);
+          if (timeframe === "" && nextTimeframes.length > 0)
+            setTimeframe(nextTimeframes[0]);
         })
         .catch(() => {
           setDataError("No se pudieron cargar los datos importados.");
         })
         .finally(() => setSymbolsLoading(false));
     }, 0);
-    return () => clearTimeout(initial);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedStrategy = catalog.find((s) => s.name === strategyName);
@@ -229,14 +250,7 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
     const strategy = catalog.find((s) => s.name === name);
     if (!strategy) return;
     setStrategyName(name);
-    setParamRanges(
-      Object.fromEntries(
-        Object.entries(strategy.parameters_schema).map(([key, schema]) => [
-          key,
-          defaultRange(key, schema),
-        ])
-      )
-    );
+    setParamRanges(defaultsForStrategy(strategy));
   };
 
   const updateRange = (key: string, field: keyof ParamRangeSpec, value: number) => {
@@ -268,25 +282,26 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
   };
 
   return (
-    <div className="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-      <SectionTitle number={1} title="Datos" icon={<Settings2 className="h-3.5 w-3.5 text-emerald-400" />} />
-      {dataError && (
-        <p className="mb-2 text-xs text-red-400" role="alert">
-          {dataError}
-        </p>
-      )}
-      {!dataError && !symbolsLoading && symbols.length === 0 && (
-        <p className="mb-2 text-xs text-yellow-400">
-          No hay datos importados. Ve al Módulo de Datos para importar.
-        </p>
-      )}
-      <div className="space-y-3">
+    <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+      <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+        <SectionTitle title="📊 Datos" />
+        {dataError && (
+          <p className="text-xs text-red-400" role="alert">
+            {dataError}
+          </p>
+        )}
+        {!dataError && !symbolsLoading && symbols.length === 0 && (
+          <p className="text-xs text-yellow-400">
+            No hay datos importados. Ve al Módulo de Datos para importar.
+          </p>
+        )}
         <SelectField
           label="Símbolo"
           value={symbol}
           onChange={setSymbol}
           disabled={symbolsLoading || symbols.length === 0}
           options={symbols.map((s) => ({ value: s, label: s }))}
+          helper="Activo a optimizar, p. ej. BTCUSDT."
         />
         <SelectField
           label="Timeframe"
@@ -294,73 +309,133 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
           onChange={setTimeframe}
           disabled={symbolsLoading || timeframes.length === 0}
           options={timeframes.map((t) => ({ value: t, label: t }))}
+          helper="Velas del gráfico usadas para el backtest."
         />
-      </div>
+      </section>
 
-      <SectionTitle number={2} title="Estrategia" icon={<Cpu className="h-3.5 w-3.5 text-emerald-400" />} />
-      {catalogError && (
-        <p className="mb-2 text-xs text-red-400" role="alert">
-          {catalogError}
-        </p>
-      )}
-      <div className="space-y-3">
+      <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <SectionTitle title="🧠 Estrategia" />
+        {catalogError && (
+          <p className="text-xs text-red-400" role="alert">
+            {catalogError}
+          </p>
+        )}
         <SelectField
           label="Estrategia"
           value={strategyName}
           onChange={handleStrategyChange}
           disabled={strategiesLoading}
           options={catalog.map((s) => ({ value: s.name, label: s.display_name }))}
+          helper="Patrón de trading sobre el que se aplica el grid search."
         />
-      </div>
-
-      <SectionTitle number={3} title="Rangos de Parámetros" icon={<SlidersHorizontal className="h-3.5 w-3.5 text-emerald-400" />} />
-      <div className="space-y-4">
-        {selectedStrategy &&
-          Object.entries(selectedStrategy.parameters_schema).map(([key, schema]) => {
-            const range = paramRanges[key] ?? defaultRange(key, schema);
-            return (
-              <div key={key} className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
-                <p className="mb-2 text-xs font-medium text-slate-200">{key}</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <NumberField
-                    label="Min"
-                    value={range.min}
-                    onChange={(v) => updateRange(key, "min", v)}
-                  />
-                  <NumberField
-                    label="Max"
-                    value={range.max}
-                    onChange={(v) => updateRange(key, "max", v)}
-                  />
-                  <NumberField
-                    label="Step"
-                    value={range.step}
-                    min={0.01}
-                    onChange={(v) => updateRange(key, "step", v)}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
-          <p className="text-xs font-medium text-slate-300">Total de combinaciones</p>
-          <p className={exceedsLimit ? "mt-1 text-lg font-bold text-red-400" : "mt-1 text-lg font-bold text-emerald-400"}>
-            {Number.isFinite(totalCombinations)
-              ? totalCombinations.toLocaleString("es-ES")
-              : "∞"}
+        <div className="rounded-lg border border-slate-800/70 bg-slate-950/40 p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            Reglas de Salida
           </p>
-          {exceedsLimit && (
-            <p className="mt-1 text-[11px] text-red-400">
-              Supera el máximo de {MAX_COMBINATIONS.toLocaleString("es-ES")}. Reduce los rangos.
-            </p>
-          )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <SelectField
+              label="Stop Loss"
+              value={exitRules.stop_loss_type}
+              onChange={(value) =>
+                setExitRules((prev) => ({ ...prev, stop_loss_type: value }))
+              }
+              options={SL_TYPES}
+            />
+            <NumberField
+              label="Valor SL"
+              value={exitRules.stop_loss_value}
+              onChange={(value) =>
+                setExitRules((prev) => ({ ...prev, stop_loss_value: value }))
+              }
+              helper="Multiplicador de ATR o porcentaje fijo de salida."
+            />
+            <SelectField
+              label="Take Profit"
+              value={exitRules.take_profit_type}
+              onChange={(value) =>
+                setExitRules((prev) => ({ ...prev, take_profit_type: value }))
+              }
+              options={TP_TYPES}
+            />
+            <NumberField
+              label="Valor TP"
+              value={exitRules.take_profit_value}
+              onChange={(value) =>
+                setExitRules((prev) => ({ ...prev, take_profit_value: value }))
+              }
+              helper="Ratio riesgo/recompensa o porcentaje fijo de beneficio."
+            />
+          </div>
         </div>
-      </div>
+      </section>
 
-      <SectionTitle number={4} title="Validación Out-of-Sample" icon={<ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />} />
-      <div className="space-y-3">
+      <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <SectionTitle title="🔢 Rangos de Parámetros" />
+        <div className="space-y-3">
+          {selectedStrategy &&
+            Object.entries(selectedStrategy.parameters_schema).map(([key, schema]) => {
+              const range = paramRanges[key] ?? defaultRange(key, schema);
+              return (
+                <div
+                  key={key}
+                  className="rounded-xl border border-slate-800 bg-slate-950/50 p-3"
+                >
+                  <p className="mb-2 text-xs font-medium text-slate-200">{key}</p>
+                  <p className="mb-2 text-[11px] text-slate-500">
+                    {schema.description}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <NumberField
+                      label="Min"
+                      value={range.min}
+                      onChange={(v) => updateRange(key, "min", v)}
+                    />
+                    <NumberField
+                      label="Max"
+                      value={range.max}
+                      onChange={(v) => updateRange(key, "max", v)}
+                    />
+                    <NumberField
+                      label="Step"
+                      value={range.step}
+                      min={0.01}
+                      onChange={(v) => updateRange(key, "step", v)}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+            <p className="text-xs font-medium text-slate-300">
+              Total de combinaciones
+            </p>
+            <p
+              className={
+                exceedsLimit
+                  ? "mt-1 text-lg font-bold text-red-400"
+                  : "mt-1 text-lg font-bold text-emerald-400"
+              }
+            >
+              {Number.isFinite(totalCombinations)
+                ? totalCombinations.toLocaleString("es-ES")
+                : "∞"}
+            </p>
+            {exceedsLimit && (
+              <p className="mt-1 text-[11px] text-red-400">
+                Supera el máximo de {MAX_COMBINATIONS.toLocaleString("es-ES")}.
+                Reduce los rangos.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <SectionTitle title="🎯 Validación OOS" />
         <label className="flex cursor-pointer items-center justify-between rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2.5">
-          <span className="text-xs font-medium text-slate-300">Activar Validación OOS</span>
+          <span className="text-xs font-medium text-slate-300">
+            Activar Validación OOS
+          </span>
           <button
             role="switch"
             aria-checked={oosEnabled}
@@ -379,6 +454,10 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
             />
           </button>
         </label>
+        <p className="text-[11px] text-slate-500">
+          Divide los datos en entrenamiento (IS) y validación (OOS) para
+          descartar configuraciones sobreajustadas.
+        </p>
 
         {oosEnabled && (
           <div className="space-y-3">
@@ -388,7 +467,8 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
                   Split ratio IS/OOS
                 </label>
                 <span className="text-xs font-bold text-emerald-400">
-                  {Math.round(splitRatio * 100)} / {Math.round((1 - splitRatio) * 100)}
+                  {Math.round(splitRatio * 100)} /{" "}
+                  {Math.round((1 - splitRatio) * 100)}
                 </span>
               </div>
               <input
@@ -400,6 +480,9 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
                 onChange={(e) => setSplitRatio(Number(e.target.value))}
                 className="w-full accent-emerald-500"
               />
+              <p className="mt-1 text-[11px] text-slate-500">
+                Porcentaje del historial dedicado al tramo In-Sample.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <NumberField
@@ -407,7 +490,7 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
                 value={oosMinPf}
                 min={1}
                 step={0.05}
-                helper="Profit Factor mínimo en OOS para ser Robusto"
+                helper="Profit Factor mínimo en OOS para ser Robusto."
                 onChange={setOosMinPf}
               />
               <NumberField
@@ -416,69 +499,49 @@ export default function OptimizationForm({ running, onRun }: OptimizationFormPro
                 min={0}
                 max={1}
                 step={0.05}
+                helper="Máximo deterioro permitido entre IS y OOS."
                 onChange={setOosMaxDegradation}
               />
               <NumberField
                 label="Trades mínimos IS"
                 value={minTrades}
                 min={1}
-                helper="Operaciones mínimas en el tramo IS"
+                helper="Operaciones mínimas en el tramo IS."
                 onChange={setMinTrades}
               />
             </div>
           </div>
         )}
-      </div>
+      </section>
 
-      <SectionTitle number={5} title="Reglas de Salida" icon={<TrendingDown className="h-3.5 w-3.5 text-emerald-400" />} />
-      <div className="grid grid-cols-2 gap-3">
-        <SelectField
-          label="Stop Loss"
-          value={exitRules.stop_loss_type}
-          onChange={(value) => setExitRules((prev) => ({ ...prev, stop_loss_type: value }))}
-          options={SL_TYPES}
-        />
-        <NumberField
-          label="Valor SL"
-          value={exitRules.stop_loss_value}
-          onChange={(value) => setExitRules((prev) => ({ ...prev, stop_loss_value: value }))}
-        />
-        <SelectField
-          label="Take Profit"
-          value={exitRules.take_profit_type}
-          onChange={(value) => setExitRules((prev) => ({ ...prev, take_profit_type: value }))}
-          options={TP_TYPES}
-        />
-        <NumberField
-          label="Valor TP"
-          value={exitRules.take_profit_value}
-          onChange={(value) => setExitRules((prev) => ({ ...prev, take_profit_value: value }))}
-        />
-      </div>
-
-      <SectionTitle number={6} title="Configuración Financiera" icon={<Wallet className="h-3.5 w-3.5 text-emerald-400" />} />
-      <div className="grid grid-cols-2 gap-3">
-        <NumberField
-          label="Capital inicial ($)"
-          value={initialCapital}
-          onChange={setInitialCapital}
-          min={1}
-        />
-        <NumberField
-          label="Comisión (%)"
-          value={commissionPct}
-          onChange={setCommissionPct}
-          min={0}
-          step={0.0001}
-        />
-        <NumberField
-          label="Slippage (%)"
-          value={slippagePct}
-          onChange={setSlippagePct}
-          min={0}
-          step={0.01}
-        />
-      </div>
+      <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <SectionTitle title="💰 Configuración Financiera" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <NumberField
+            label="Capital inicial ($)"
+            value={initialCapital}
+            onChange={setInitialCapital}
+            min={1}
+            helper="Dinero disponible para operar en la simulación."
+          />
+          <NumberField
+            label="Comisión (%)"
+            value={commissionPct}
+            onChange={setCommissionPct}
+            min={0}
+            step={0.0001}
+            helper="Comisión por operación sobre el volumen, en %."
+          />
+          <NumberField
+            label="Slippage (%)"
+            value={slippagePct}
+            onChange={setSlippagePct}
+            min={0}
+            step={0.01}
+            helper="Deslizamiento estimado entre precio teórico y de ejecución."
+          />
+        </div>
+      </section>
 
       <button
         onClick={handleSubmit}

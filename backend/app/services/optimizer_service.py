@@ -108,6 +108,10 @@ def start_optimization_task(
                     strategy_name=strategy_name,
                     param_ranges_raw=param_ranges_raw,
                     oos_config=oos_config,
+                    exit_rules=exit_rules,
+                    initial_capital=initial_capital,
+                    commission_pct=commission_pct,
+                    slippage_pct=slippage_pct,
                 )
         except Exception as exc:
             task["status"] = "failed"
@@ -127,6 +131,10 @@ def _persist_optimization_run(
     strategy_name: str | None,
     param_ranges_raw: dict,
     oos_config: dict,
+    exit_rules: dict,
+    initial_capital: float,
+    commission_pct: float,
+    slippage_pct: float,
 ) -> None:
     try:
         db = SessionLocal()
@@ -138,6 +146,10 @@ def _persist_optimization_run(
             run.strategy_name = strategy_name or ""
             run.param_ranges = param_ranges_raw
             run.oos_config = oos_config
+            run.exit_rules = exit_rules
+            run.initial_capital = initial_capital
+            run.commission_pct = commission_pct
+            run.slippage_pct = slippage_pct
             run.candidates = result.get("candidates", [])
             run.total_combinations = result.get("total_combinations", 0)
             run.completed_combinations = result.get("completed", 0)

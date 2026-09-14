@@ -1,11 +1,16 @@
 import logging
 import os
+import uuid
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.config import DATA_STORAGE_DIR, VALID_TIMEFRAMES
+from app.core.models import OptimizationRun
 from app.core.strategies.registry import registry
+from app.infra.db import SessionLocal
 from app.infra.parquet_utils import load_parquet
 from app.services import optimizer_service
 
@@ -155,3 +160,103 @@ def get_task_results(task_id: str):
     if persisted is None:
         raise HTTPException(status_code=404, detail="Tarea de optimización no encontrada")
     return {"status": "completed", **persisted}
+
+
+def _robust_count(candidates: list) -> int:
+    return sum(1 for c in candidates if c.get("verdict") == "robust")
+
+
+def _best_pf_oos(candidates: list) -> float | None:
+    values = [
+        c.get("oos_metrics", {}).get("profit_factor")
+        for c in candidates
+        if c.get("oos_metrics", {}).get("profit_factor") is not None
+    ]
+    return max(values) if values else None
+
+
+def _run_to_summary(run: OptimizationRun) -> dict:
+    return {
+        "id": str(run.id),
+        "symbol": run.symbol,
+        "timeframe": run.timeframe,
+        "strategy_name": run.strategy_name,
+        "total_combinations": run.total_combinations,
+        "robust_count": _robust_count(run.candidates),
+        "best_pf_oos": _best_pf_oos(run.candidates),
+        "created_at": run.created_at,
+    }
+
+
+@router.get("/history")
+def list_optimizations(
+    strategy_name: str | None = None,
+    symbol: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    stmt = select(OptimizationRun)
+    if strategy_name:
+        stmt = stmt.where(OptimizationRun.strategy_name == strategy_name)
+    if symbol:
+        stmt = stmt.where(OptimizationRun.symbol == symbol)
+    stmt = stmt.order_by(OptimizationRun.created_at.desc()).offset(offset).limit(limit)
+
+    db: Session = SessionLocal()
+    try:
+        runs = db.execute(stmt).scalars().all()
+    finally:
+        db.close()
+    return [_run_to_summary(run) for run in runs]
+
+
+@router.get("/{optimization_id}")
+def get_optimization_detail(optimization_id: str) -> dict:
+    try:
+        run_uuid = uuid.UUID(optimization_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Optimización no encontrada") from exc
+
+    db: Session = SessionLocal()
+    try:
+        run = db.get(OptimizationRun, run_uuid)
+    finally:
+        db.close()
+
+    if run is None:
+        raise HTTPException(status_code=404, detail="Optimización no encontrada")
+    return {
+        **_run_to_summary(run),
+        "param_ranges": run.param_ranges,
+        "oos_config": run.oos_config,
+        "exit_rules": run.exit_rules,
+        "initial_capital": run.initial_capital,
+        "commission_pct": run.commission_pct,
+        "slippage_pct": run.slippage_pct,
+        "completed_combinations": run.completed_combinations,
+        "candidates": run.candidates,
+    }
+
+
+@router.delete("/{optimization_id}")
+def delete_optimization(optimization_id: str) -> dict:
+    logger.info("Eliminando optimización ID: %s", optimization_id)
+    try:
+        run_uuid = uuid.UUID(optimization_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Optimización no encontrada") from exc
+
+    db: Session = SessionLocal()
+    try:
+        run = db.get(OptimizationRun, run_uuid)
+        if run is None:
+            raise HTTPException(status_code=404, detail="Optimización no encontrada")
+        db.delete(run)
+        db.commit()
+    finally:
+        db.close()
+
+    logger.info("Optimización eliminada correctamente: %s", optimization_id)
+    return {"status": "deleted", "id": optimization_id}

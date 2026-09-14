@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api.routers import (
     backtest,
@@ -41,10 +42,44 @@ def _configure_logging() -> None:
         root.addHandler(stream)
 
 
+def _migrate_optimizer_columns() -> None:
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE optimization_runs "
+                    "ADD COLUMN IF NOT EXISTS exit_rules JSONB NOT NULL DEFAULT '{}'::jsonb"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE optimization_runs "
+                    "ADD COLUMN IF NOT EXISTS initial_capital DOUBLE PRECISION NOT NULL DEFAULT 10000"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE optimization_runs "
+                    "ADD COLUMN IF NOT EXISTS commission_pct DOUBLE PRECISION NOT NULL DEFAULT 0.001"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE optimization_runs "
+                    "ADD COLUMN IF NOT EXISTS slippage_pct DOUBLE PRECISION NOT NULL DEFAULT 0.1"
+                )
+            )
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "No se pudo aplicar la migración de optimization_runs: %s", exc
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _configure_logging()
     Base.metadata.create_all(bind=engine)
+    _migrate_optimizer_columns()
     root_logger = logging.getLogger("app")
     root_logger.info("Iniciando LasaTrading API v3.0")
     start_task_manager()
