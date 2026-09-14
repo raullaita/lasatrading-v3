@@ -42,6 +42,7 @@ class StrategyCreate(BaseModel):
 class StrategyUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     is_active: bool | None = None
+    base_strategy_name: str | None = None
     symbol: str | None = None
     timeframe: str | None = None
     pattern_params: dict | None = None
@@ -133,6 +134,10 @@ def update_strategy(
         item.name = payload.name.strip()
     if payload.is_active is not None:
         item.is_active = payload.is_active
+    if payload.base_strategy_name is not None:
+        if registry.get_by_name(payload.base_strategy_name) is None:
+            raise HTTPException(status_code=422, detail="Estrategia base no encontrada")
+        item.base_strategy_name = payload.base_strategy_name
     if payload.symbol is not None:
         item.symbol = payload.symbol.strip().upper()
     if payload.timeframe is not None:

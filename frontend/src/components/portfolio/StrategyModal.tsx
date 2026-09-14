@@ -48,19 +48,26 @@ function SectionTitle({
   number,
   title,
   icon,
+  description,
 }: {
   number: number;
   title: string;
   icon: ReactNode;
+  description?: string;
 }) {
   return (
-    <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
-      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-emerald-400">
-        {number}
-      </span>
-      {icon}
-      {title}
-    </h2>
+    <div className="mb-3">
+      <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-emerald-400">
+          {number}
+        </span>
+        {icon}
+        {title}
+      </h2>
+      {description && (
+        <p className="mt-1 pl-7 text-[11px] text-slate-500">{description}</p>
+      )}
+    </div>
   );
 }
 
@@ -69,11 +76,13 @@ function NumberField({
   value,
   onChange,
   helper,
+  step,
 }: {
   label: string;
   value: number | string;
   onChange: (value: number) => void;
   helper?: string;
+  step?: string;
 }) {
   return (
     <div>
@@ -83,7 +92,7 @@ function NumberField({
       <input
         type="number"
         value={value}
-        step="any"
+        step={step ?? "any"}
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-emerald-500/50 focus:outline-none"
       />
@@ -128,12 +137,14 @@ function SelectField({
   );
 }
 
-function defaultParams(schema: Record<string, ParameterSchema>): Record<string, number> {
+function defaultParams(
+  schema: Record<string, ParameterSchema>,
+): Record<string, number> {
   return Object.fromEntries(
     Object.entries(schema).map(([key, s]) => [
       key,
       typeof s.default === "number" ? s.default : 0,
-    ])
+    ]),
   );
 }
 
@@ -148,12 +159,14 @@ export default function StrategyModal({
 
   const [name, setName] = useState(strategy?.name ?? "");
   const [baseStrategyName, setBaseStrategyName] = useState(
-    strategy?.base_strategy_name ?? ""
+    strategy?.base_strategy_name ?? "",
   );
   const [symbol, setSymbol] = useState(strategy?.symbol ?? SYMBOLS[0]);
-  const [timeframe, setTimeframe] = useState(strategy?.timeframe ?? TIMEFRAMES[0]);
+  const [timeframe, setTimeframe] = useState(
+    strategy?.timeframe ?? TIMEFRAMES[0],
+  );
   const [patternParams, setPatternParams] = useState<Record<string, number>>(
-    strategy?.pattern_params ?? {}
+    strategy?.pattern_params ?? {},
   );
   const [exitRules, setExitRules] = useState<ExitRules>(
     strategy?.exit_rules ?? {
@@ -161,13 +174,13 @@ export default function StrategyModal({
       stop_loss_value: 1.5,
       take_profit_type: "risk_reward_ratio",
       take_profit_value: 2.0,
-    }
+    },
   );
   const [riskType, setRiskType] = useState(
-    strategy?.risk_management?.type ?? "percent_risk"
+    strategy?.risk_management?.type ?? "percent_risk",
   );
   const [riskValue, setRiskValue] = useState(
-    strategy?.risk_management?.value ?? 2.0
+    strategy?.risk_management?.value ?? 2.0,
   );
 
   const [saving, setSaving] = useState(false);
@@ -188,7 +201,8 @@ export default function StrategyModal({
         }
       })
       .catch(() => {
-        if (!cancelled) setCatalogError("No se pudo cargar el catálogo de estrategias.");
+        if (!cancelled)
+          setCatalogError("No se pudo cargar el catálogo de estrategias.");
       })
       .finally(() => {
         if (!cancelled) setCatalogLoading(false);
@@ -232,7 +246,9 @@ export default function StrategyModal({
         risk_management: { type: riskType, value: riskValue },
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar la estrategia.");
+      setError(
+        err instanceof Error ? err.message : "Error al guardar la estrategia.",
+      );
       setSaving(false);
     }
   };
@@ -282,6 +298,9 @@ export default function StrategyModal({
                   placeholder="Ej: BTC 15m RSI - Rank 1"
                   className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none"
                 />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Nombre descriptivo para identificar esta configuración
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -300,64 +319,152 @@ export default function StrategyModal({
               </div>
 
               <div>
-                <SectionTitle number={1} title="Estrategia base" icon={<Cpu className="h-3.5 w-3.5 text-emerald-400" />} />
+                <SectionTitle
+                  number={1}
+                  title="Estrategia base"
+                  icon={<Cpu className="h-3.5 w-3.5 text-emerald-400" />}
+                  description="Selecciona el algoritmo de análisis técnico. Los parámetros se actualizarán según la estrategia elegida."
+                />
                 <SelectField
                   label="Estrategia"
                   value={baseStrategyName}
                   onChange={handleStrategyChange}
-                  options={catalog.map((s) => ({ value: s.name, label: s.display_name }))}
+                  options={catalog.map((s) => ({
+                    value: s.name,
+                    label: s.display_name,
+                  }))}
                 />
+                {selectedStrategy && (
+                  <p className="mt-1.5 text-[11px] text-slate-500">
+                    {selectedStrategy.description}
+                  </p>
+                )}
               </div>
 
-              {selectedStrategy && (
-                <div>
-                  <SectionTitle number={2} title="Parámetros del patrón" icon={<SlidersHorizontal className="h-3.5 w-3.5 text-emerald-400" />} />
-                  <div className="grid grid-cols-2 gap-3">
-                    {Object.entries(selectedStrategy.parameters_schema).map(([key, schema]) => (
-                      <NumberField
-                        key={key}
-                        label={key}
-                        value={patternParams[key] ?? schema.default}
-                        helper={schema.description}
-                        onChange={(value) =>
-                          setPatternParams((prev) => ({ ...prev, [key]: value }))
-                        }
-                      />
-                    ))}
+              {selectedStrategy &&
+                Object.keys(selectedStrategy.parameters_schema).length > 0 && (
+                  <div>
+                    <SectionTitle
+                      number={2}
+                      title="Parámetros del patrón"
+                      icon={
+                        <SlidersHorizontal className="h-3.5 w-3.5 text-emerald-400" />
+                      }
+                      description="Ajusta los valores óptimos que definieron el rendimiento de la optimización."
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      {Object.entries(selectedStrategy.parameters_schema).map(
+                        ([key, schema]) => (
+                          <NumberField
+                            key={key}
+                            label={key}
+                            value={patternParams[key] ?? schema.default ?? 0}
+                            helper={schema.description}
+                            onChange={(value) =>
+                              setPatternParams((prev) => ({
+                                ...prev,
+                                [key]: value,
+                              }))
+                            }
+                          />
+                        ),
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               <div>
-                <SectionTitle number={3} title="Reglas de salida" icon={<TrendingDown className="h-3.5 w-3.5 text-emerald-400" />} />
+                <SectionTitle
+                  number={
+                    selectedStrategy &&
+                    Object.keys(selectedStrategy.parameters_schema).length > 0
+                      ? 3
+                      : 2
+                  }
+                  title="Reglas de salida"
+                  icon={
+                    <TrendingDown className="h-3.5 w-3.5 text-emerald-400" />
+                  }
+                  description="Define cuándo cerrar una posición. SL limita pérdidas, TP fija el objetivo de ganancia."
+                />
                 <div className="grid grid-cols-2 gap-3">
                   <SelectField
                     label="Stop Loss"
                     value={exitRules.stop_loss_type}
-                    onChange={(value) => setExitRules((prev) => ({ ...prev, stop_loss_type: value }))}
+                    onChange={(value) =>
+                      setExitRules((prev) => ({
+                        ...prev,
+                        stop_loss_type: value,
+                      }))
+                    }
                     options={SL_TYPES}
                   />
                   <NumberField
                     label="Valor SL"
                     value={exitRules.stop_loss_value}
-                    onChange={(value) => setExitRules((prev) => ({ ...prev, stop_loss_value: value }))}
+                    step={
+                      exitRules.stop_loss_type === "atr_multiplier"
+                        ? "0.1"
+                        : "0.01"
+                    }
+                    onChange={(value) =>
+                      setExitRules((prev) => ({
+                        ...prev,
+                        stop_loss_value: value,
+                      }))
+                    }
+                    helper={
+                      exitRules.stop_loss_type === "atr_multiplier"
+                        ? "Multiplicador del ATR"
+                        : "Porcentaje de pérdida máxima"
+                    }
                   />
                   <SelectField
                     label="Take Profit"
                     value={exitRules.take_profit_type}
-                    onChange={(value) => setExitRules((prev) => ({ ...prev, take_profit_type: value }))}
+                    onChange={(value) =>
+                      setExitRules((prev) => ({
+                        ...prev,
+                        take_profit_type: value,
+                      }))
+                    }
                     options={TP_TYPES}
                   />
                   <NumberField
                     label="Valor TP"
                     value={exitRules.take_profit_value}
-                    onChange={(value) => setExitRules((prev) => ({ ...prev, take_profit_value: value }))}
+                    step={
+                      exitRules.take_profit_type === "risk_reward_ratio"
+                        ? "0.1"
+                        : "0.01"
+                    }
+                    onChange={(value) =>
+                      setExitRules((prev) => ({
+                        ...prev,
+                        take_profit_value: value,
+                      }))
+                    }
+                    helper={
+                      exitRules.take_profit_type === "risk_reward_ratio"
+                        ? "Ratio objetivo sobre el riesgo asumido"
+                        : "Porcentaje de ganancia objetivo"
+                    }
                   />
                 </div>
               </div>
 
               <div>
-                <SectionTitle number={4} title="Gestión de riesgo" icon={<ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />} />
+                <SectionTitle
+                  number={
+                    selectedStrategy &&
+                    Object.keys(selectedStrategy.parameters_schema).length > 0
+                      ? 4
+                      : 3
+                  }
+                  title="Gestión de riesgo"
+                  icon={<ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />}
+                  description="Controla cuánto capital arriesgar en cada operación."
+                />
                 <div className="grid grid-cols-2 gap-3">
                   <SelectField
                     label="Tipo"
@@ -369,7 +476,11 @@ export default function StrategyModal({
                     label="Valor"
                     value={riskValue}
                     onChange={setRiskValue}
-                    helper={riskType === "percent_risk" ? "Porcentaje del capital arriesgado por operación" : undefined}
+                    helper={
+                      riskType === "percent_risk"
+                        ? "Porcentaje del capital arriesgado por operación"
+                        : "Unidades fijas por operación"
+                    }
                   />
                 </div>
               </div>
@@ -377,7 +488,9 @@ export default function StrategyModal({
               <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
                 <p className="text-xs text-slate-400">Resumen</p>
                 <p className="mt-1 font-mono text-xs text-slate-300">
-                  {selectedStrategy ? selectedStrategy.display_name : baseStrategyName}
+                  {selectedStrategy
+                    ? selectedStrategy.display_name
+                    : baseStrategyName}
                   {" · "}
                   {symbol.toUpperCase()} {timeframe}
                   {" · "}
@@ -406,7 +519,7 @@ export default function StrategyModal({
               disabled={catalogLoading || saving}
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
-                "bg-emerald-600 text-slate-950 hover:bg-emerald-500"
+                "bg-emerald-600 text-slate-950 hover:bg-emerald-500",
               )}
             >
               {saving ? (

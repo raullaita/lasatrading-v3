@@ -10,6 +10,7 @@ import {
   Trash2,
   Wallet,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import StrategyModal from "@/components/portfolio/StrategyModal";
 import StrategyRow from "@/components/portfolio/StrategyRow";
@@ -28,7 +29,9 @@ export default function PortfolioPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingStrategy, setEditingStrategy] = useState<CreateStrategyPayload & { id?: string } | null>(null);
+  const [editingStrategy, setEditingStrategy] = useState<
+    (CreateStrategyPayload & { id?: string }) | null
+  >(null);
   const [deleteTarget, setDeleteTarget] = useState<UserStrategy | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -43,7 +46,7 @@ export default function PortfolioPage() {
           setError(
             err instanceof Error
               ? err.message
-              : "No se pudieron cargar las estrategias."
+              : "No se pudieron cargar las estrategias.",
           );
         })
         .finally(() => setLoading(false));
@@ -67,7 +70,9 @@ export default function PortfolioPage() {
   const handleSave = async (data: Omit<CreateStrategyPayload, "is_active">) => {
     if (editingStrategy?.id) {
       const updated = await updateStrategy(editingStrategy.id, data);
-      setStrategies((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      setStrategies((prev) =>
+        prev.map((s) => (s.id === updated.id ? updated : s)),
+      );
     } else {
       const created = await createStrategy({ ...data, is_active: false });
       setStrategies((prev) => [created, ...prev]);
@@ -77,11 +82,25 @@ export default function PortfolioPage() {
   };
 
   const handleToggle = async (strategy: UserStrategy) => {
+    const previousStrategies = strategies;
+    const newActive = !strategy.is_active;
+
+    setStrategies((prev) =>
+      prev.map((s) =>
+        s.id === strategy.id ? { ...s, is_active: newActive } : s,
+      ),
+    );
+    toast.info(
+      newActive
+        ? `Estrategia "${strategy.name}" activada`
+        : `Estrategia "${strategy.name}" pausada`,
+    );
+
     try {
-      const updated = await toggleStrategy(strategy.id);
-      setStrategies((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cambiar el estado.");
+      await toggleStrategy(strategy.id);
+    } catch {
+      setStrategies(previousStrategies);
+      toast.error("No se pudo cambiar el estado de la estrategia.");
     }
   };
 
@@ -92,18 +111,38 @@ export default function PortfolioPage() {
     try {
       await deleteStrategy(deleteTarget.id);
       setStrategies((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      toast.success("Estrategia eliminada");
       setDeleteTarget(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo eliminar la estrategia.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo eliminar la estrategia.",
+      );
     } finally {
       setDeleting(false);
     }
   };
 
   const summaryCards = [
-    { label: "Total", value: strategies.length, icon: <Layers className="h-4 w-4" />, className: "text-slate-50" },
-    { label: "Activas", value: activeCount, icon: <Activity className="h-4 w-4" />, className: "text-emerald-400" },
-    { label: "Pausadas", value: pausedCount, icon: <PauseCircle className="h-4 w-4" />, className: "text-slate-400" },
+    {
+      label: "Total",
+      value: strategies.length,
+      icon: <Layers className="h-4 w-4" />,
+      className: "text-slate-50",
+    },
+    {
+      label: "Activas",
+      value: activeCount,
+      icon: <Activity className="h-4 w-4" />,
+      className: "text-emerald-400",
+    },
+    {
+      label: "Pausadas",
+      value: pausedCount,
+      icon: <PauseCircle className="h-4 w-4" />,
+      className: "text-slate-400",
+    },
   ];
 
   return (
@@ -162,8 +201,8 @@ export default function PortfolioPage() {
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-800 px-6 py-16 text-center">
             <Wallet className="h-8 w-8 text-slate-600" />
             <p className="text-sm text-slate-400">
-              Aún no tienes estrategias. Ve al Optimizador o Backtest para guardar
-              tus primeras configuraciones.
+              Aún no tienes estrategias. Ve al Optimizador o Backtest para
+              guardar tus primeras configuraciones.
             </p>
             <button
               onClick={handleAdd}
@@ -206,11 +245,15 @@ export default function PortfolioPage() {
             className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-50">Eliminar estrategia</h2>
+            <h2 className="text-lg font-semibold text-slate-50">
+              Eliminar estrategia
+            </h2>
             <p className="mt-2 text-sm text-slate-400">
               ¿Seguro que quieres eliminar{" "}
-              <span className="font-semibold text-slate-200">{deleteTarget.name}</span>?
-              Esta acción no se puede deshacer.
+              <span className="font-semibold text-slate-200">
+                {deleteTarget.name}
+              </span>
+              ? Esta acción no se puede deshacer.
             </p>
             <div className="mt-5 flex gap-3">
               <button
