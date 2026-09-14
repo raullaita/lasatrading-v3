@@ -280,7 +280,7 @@ function JournalContent() {
                   <th className="px-4 py-3 font-medium">Salida</th>
                   <th className="px-4 py-3 font-medium">P&L</th>
                   <th className="px-4 py-3 font-medium">Estado</th>
-                  <th className="px-4 py-3 text-right font-medium">Acciones</th>
+                  <th className="px-4 py-3 text-center font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>

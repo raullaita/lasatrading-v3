@@ -1,0 +1,20 @@
+{
+  "name": "lasatrading-v3",
+  "version": "3.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npm run db:up && concurrently --kill-others-on-fail -n backend,frontend -c green,magenta \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "status": "npm run status:db && npm run status:backend && npm run status:frontend",
+    "stop": "npm run kill:apps && docker compose stop",
+    "db:up": "docker compose up -d --wait postgres redis",
+    "dev:backend": "cd backend && PYTHONPATH=app .venv/bin/python -m uvicorn app.main:app --reload --port 8000",
+    "dev:frontend": "cd frontend && npm run dev",
+    "status:db": "docker compose ps",
+    "status:backend": "curl -s -m 2 http://localhost:8000/api/v1/health || echo 'Backend DOWN'",
+    "status:frontend": "curl -s -o /dev/null -m 2 -w 'Frontend: HTTP %{http_code}\\n' http://localhost:3000 || echo 'Frontend DOWN'",
+    "kill:apps": "pkill -f 'uvicorn app[.]main:app'; pkill -f 'next de[v]'"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

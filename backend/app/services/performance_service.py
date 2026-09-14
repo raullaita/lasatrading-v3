@@ -79,7 +79,11 @@ def compute_equity_curve(
         ts = trade.exit_timestamp
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
-        points.append({"timestamp": ts.isoformat(), "balance": round(balance, 2)})
+        key = ts.isoformat()
+        if points and points[-1]["timestamp"] == key:
+            points[-1]["balance"] = round(balance, 2)
+        else:
+            points.append({"timestamp": key, "balance": round(balance, 2)})
 
     if len(points) > MAX_EQUITY_POINTS:
         step = math.ceil(len(points) / MAX_EQUITY_POINTS)

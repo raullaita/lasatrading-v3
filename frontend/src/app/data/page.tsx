@@ -262,7 +262,7 @@ export default function DataPage() {
                       </span>
                     </th>
                   ))}
-                  <th className="px-5 py-3 text-right font-medium">Acciones</th>
+                  <th className="px-5 py-3 text-center font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>

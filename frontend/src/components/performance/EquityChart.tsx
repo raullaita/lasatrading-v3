@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   ColorType,
   LineSeries,
@@ -15,12 +15,38 @@ interface EquityChartProps {
   height?: number;
 }
 
+interface NormalizedPoint {
+  time: UTCTimestamp;
+  value: number;
+}
+
 export default function EquityChart({ data, height = 400 }: EquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const normalized = useMemo<NormalizedPoint[]>(() => {
+    const sorted = data
+      .map((point) => ({
+        time: Math.floor(Date.parse(point.timestamp) / 1000) as UTCTimestamp,
+        value: point.balance,
+      }))
+      .filter((point) => Number.isFinite(point.time))
+      .sort((a, b) => (a.time as number) - (b.time as number));
+
+    const result: NormalizedPoint[] = [];
+    for (const point of sorted) {
+      const last = result[result.length - 1];
+      if (last && last.time === point.time) {
+        last.value = point.value;
+      } else {
+        result.push(point);
+      }
+    }
+    return result;
+  }, [data]);
+
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || data.length === 0) return;
+    if (!container || normalized.length === 0) return;
 
     const chart = createChart(container, {
       width: container.clientWidth,
@@ -44,11 +70,7 @@ export default function EquityChart({ data, height = 400 }: EquityChartProps) {
       lastValueVisible: true,
     });
 
-    const lineData = data.map((point) => ({
-      time: Math.floor(Date.parse(point.timestamp) / 1000) as UTCTimestamp,
-      value: point.balance,
-    }));
-    series.setData(lineData);
+    series.setData(normalized);
     chart.timeScale().fitContent();
 
     const observer = new ResizeObserver(() => {
@@ -60,9 +82,9 @@ export default function EquityChart({ data, height = 400 }: EquityChartProps) {
       observer.disconnect();
       chart.remove();
     };
-  }, [data, height]);
+  }, [normalized, height]);
 
-  if (data.length === 0) {
+  if (normalized.length === 0) {
     return (
       <div
         style={{ height }}

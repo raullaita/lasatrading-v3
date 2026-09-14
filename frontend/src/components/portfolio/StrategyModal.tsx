@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 
-import { getStrategiesCatalog } from "@/lib/api";
+import { getDataStatus, getStrategiesCatalog } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ExitRules } from "@/types/backtest";
 import type { CreateStrategyPayload } from "@/types/portfolio";
@@ -19,9 +19,6 @@ import type {
   ParameterSchema,
   StrategyCatalogItem,
 } from "@/types/strategies";
-
-const SYMBOLS = ["BTCUSDT", "ETHUSDT", "XRPUSDT"];
-const TIMEFRAMES = ["15m", "1h", "4h"];
 
 const SL_TYPES = [
   { value: "atr_multiplier", label: "ATR (multiplicador)", step: 0.1 },
@@ -157,14 +154,17 @@ export default function StrategyModal({
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
+  const [symbols, setSymbols] = useState<string[]>([]);
+  const [timeframes, setTimeframes] = useState<string[]>([]);
+  const [symbolsLoading, setSymbolsLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+
   const [name, setName] = useState(strategy?.name ?? "");
   const [baseStrategyName, setBaseStrategyName] = useState(
     strategy?.base_strategy_name ?? "",
   );
-  const [symbol, setSymbol] = useState(strategy?.symbol ?? SYMBOLS[0]);
-  const [timeframe, setTimeframe] = useState(
-    strategy?.timeframe ?? TIMEFRAMES[0],
-  );
+  const [symbol, setSymbol] = useState(strategy?.symbol ?? "");
+  const [timeframe, setTimeframe] = useState(strategy?.timeframe ?? "");
   const [patternParams, setPatternParams] = useState<Record<string, number>>(
     strategy?.pattern_params ?? {},
   );
@@ -208,6 +208,25 @@ export default function StrategyModal({
         if (!cancelled) setCatalogLoading(false);
       });
 
+    getDataStatus()
+      .then((data) => {
+        if (cancelled) return;
+        const nextSymbols = [...new Set(data.map((d) => d.symbol))];
+        const nextTimeframes = [...new Set(data.map((d) => d.timeframe))];
+        setSymbols(nextSymbols);
+        setTimeframes(nextTimeframes);
+        if (symbol === "" && nextSymbols.length > 0) setSymbol(nextSymbols[0]);
+        if (timeframe === "" && nextTimeframes.length > 0)
+          setTimeframe(nextTimeframes[0]);
+      })
+      .catch(() => {
+        if (!cancelled)
+          setDataError("No se pudieron cargar los datos importados.");
+      })
+      .finally(() => {
+        if (!cancelled) setSymbolsLoading(false);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -231,6 +250,14 @@ export default function StrategyModal({
     }
     if (!selectedStrategy) {
       setError("Selecciona una estrategia base.");
+      return;
+    }
+    if (!symbol.trim()) {
+      setError("Selecciona un símbolo.");
+      return;
+    }
+    if (!timeframe.trim()) {
+      setError("Selecciona un timeframe.");
       return;
     }
     setSaving(true);
@@ -304,17 +331,29 @@ export default function StrategyModal({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                {dataError && (
+                  <p className="col-span-2 text-xs text-red-400" role="alert">
+                    {dataError}
+                  </p>
+                )}
+                {!dataError && !symbolsLoading && symbols.length === 0 && (
+                  <p className="col-span-2 text-xs text-yellow-400">
+                    No hay datos importados. Ve al Módulo de Datos para importar.
+                  </p>
+                )}
                 <SelectField
                   label="Símbolo"
                   value={symbol}
                   onChange={setSymbol}
-                  options={SYMBOLS.map((s) => ({ value: s, label: s }))}
+                  disabled={symbolsLoading || symbols.length === 0}
+                  options={symbols.map((s) => ({ value: s, label: s }))}
                 />
                 <SelectField
                   label="Timeframe"
                   value={timeframe}
                   onChange={setTimeframe}
-                  options={TIMEFRAMES.map((t) => ({ value: t, label: t }))}
+                  disabled={symbolsLoading || timeframes.length === 0}
+                  options={timeframes.map((t) => ({ value: t, label: t }))}
                 />
               </div>
 

@@ -2,7 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from app.core.config import VALID_TIMEFRAMES
 from app.core.models import MonitorJob, UserStrategy
 from app.core.strategies.registry import registry
 from app.infra.db import get_db
+from app.services.data_import_service import ensure_symbol_timeframe_imported
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,11 @@ def get_strategy(strategy_id: str, db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/strategies", status_code=201)
-def create_strategy(payload: StrategyCreate, db: Session = Depends(get_db)):
+def create_strategy(
+    payload: StrategyCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     if registry.get_by_name(payload.base_strategy_name) is None:
         raise HTTPException(status_code=422, detail="Estrategia base no encontrada")
     if not payload.symbol.strip().upper():
@@ -120,6 +125,9 @@ def create_strategy(payload: StrategyCreate, db: Session = Depends(get_db)):
         item.name,
         item.symbol,
         item.timeframe,
+    )
+    background_tasks.add_task(
+        ensure_symbol_timeframe_imported, item.symbol, item.timeframe, None
     )
     return _to_dict(item)
 
@@ -175,7 +183,11 @@ def delete_strategy(strategy_id: str, db: Session = Depends(get_db)) -> dict:
 
 
 @router.patch("/strategies/{strategy_id}/toggle")
-def toggle_strategy(strategy_id: str, db: Session = Depends(get_db)) -> dict:
+def toggle_strategy(
+    strategy_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> dict:
     item = _get_strategy_or_404(db, strategy_id)
     item.is_active = not item.is_active
     item.updated_at = datetime.now(timezone.utc)
@@ -198,6 +210,9 @@ def toggle_strategy(strategy_id: str, db: Session = Depends(get_db)) -> dict:
         else:
             job.status = "running"
             job.error_count = 0
+        background_tasks.add_task(
+            ensure_symbol_timeframe_imported, item.symbol, item.timeframe, None
+        )
     else:
         if job is not None:
             job.status = "paused"
