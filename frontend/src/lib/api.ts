@@ -45,6 +45,16 @@ import type {
   SystemLogEntry,
   SystemLogsQuery,
 } from "@/types/system";
+import type {
+  RegimeRequest,
+  RegimeResponse,
+  RegimesResponse,
+  SweepHistoryItem,
+  SweepResultsResponse,
+  SweepRunQueued,
+  SweepRunRequest,
+  SweepStatusResponse,
+} from "@/types/sweep";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -385,5 +395,41 @@ export function getSystemLogs(
 ): Promise<SystemLogEntry[]> {
   return request<SystemLogEntry[]>(
     `/api/v1/system/logs${buildQuery(params)}`
+  );
+}
+
+export function runSweep(payload: SweepRunRequest): Promise<SweepRunQueued> {
+  return request<SweepRunQueued>("/api/v1/sweep/run", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getSweepStatus(): Promise<SweepStatusResponse> {
+  return request<SweepStatusResponse>("/api/v1/sweep/status");
+}
+
+export function getSweepResults(): Promise<SweepResultsResponse> {
+  return request<SweepResultsResponse>("/api/v1/sweep/results");
+}
+
+export function runMarketRegime(
+  payload: RegimeRequest
+): Promise<RegimeResponse> {
+  return request<RegimeResponse>("/api/v1/sweep/regime", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getMarketRegimes(): Promise<RegimesResponse> {
+  return request<RegimesResponse>("/api/v1/sweep/regimes");
+}
+
+export function getSweepHistory(
+  limit = 20
+): Promise<SweepHistoryItem[]> {
+  return request<SweepHistoryItem[]>(
+    `/api/v1/sweep/history?limit=${limit}`
   );
 }

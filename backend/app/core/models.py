@@ -240,3 +240,27 @@ class Trade(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=func.now()
     )
+
+
+class SweepRun(Base):
+    __tablename__ = "sweep_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    run_id: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="running")
+    reset: Mapped[bool] = mapped_column(Boolean, default=False)
+    timeframes: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    symbols: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    results: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    summary: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    no_go: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    output_dir: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
