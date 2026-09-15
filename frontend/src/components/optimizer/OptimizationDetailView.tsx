@@ -1,8 +1,16 @@
 "use client";
 
-import { CalendarDays, FlaskConical, Layers, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import {
+  CalendarDays,
+  FlaskConical,
+  Layers,
+  ShieldCheck,
+  Trophy,
+} from "lucide-react";
 
 import OptimizationResults from "@/components/optimizer/OptimizationResults";
+import SendToPortfolioModal from "@/components/optimizer/SendToPortfolioModal";
 import type {
   OptimizationDetail,
   OptimizationRequest,
@@ -22,9 +30,14 @@ interface OptimizationDetailViewProps {
 export default function OptimizationDetailView({
   detail,
 }: OptimizationDetailViewProps) {
+  const [portfolioModalOpen, setPortfolioModalOpen] = useState(false);
   const robustCount = detail.candidates.filter(
     (c) => c.verdict === "robust"
   ).length;
+
+  const topCandidate =
+    detail.candidates.find((c) => c.rank === 1) ??
+    detail.candidates.slice().sort((a, b) => a.rank - b.rank)[0] ?? null;
 
   const request: OptimizationRequest = {
     symbol: detail.symbol,
@@ -74,11 +87,28 @@ export default function OptimizationDetailView({
               <FlaskConical className="h-3.5 w-3.5 text-slate-400" />
               {detail.total_combinations.toLocaleString("es-ES")} combinaciones
             </span>
+            <button
+              onClick={() => setPortfolioModalOpen(true)}
+              disabled={!topCandidate}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 font-semibold text-emerald-400 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trophy className="h-3.5 w-3.5" />
+              Guardar Configuración Ganadora en Portafolio
+            </button>
           </div>
         </div>
       </header>
 
       <OptimizationResults result={detail} request={request} />
+
+      {portfolioModalOpen && topCandidate && (
+        <SendToPortfolioModal
+          key={topCandidate.rank}
+          candidate={topCandidate}
+          request={request}
+          onClose={() => setPortfolioModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

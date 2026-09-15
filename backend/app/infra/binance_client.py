@@ -7,6 +7,7 @@ BINANCE_BASE_URL = "https://api.binance.com"
 KLINES_ENDPOINT = "/api/v3/klines"
 MAX_RETRIES = 3
 TIMEOUT_SECONDS = 15
+PACE_BETWEEN_REQUESTS_SEC = 0.1
 
 DEFAULT_TOP_LEVEL_HEADERS = {
     "Accept-Encoding": "gzip, deflate",
@@ -50,7 +51,9 @@ def fetch_klines(
                     time.sleep(delay)
                     continue
             resp.raise_for_status()
-            return [_row_to_candle(row) for row in resp.json()]
+            candles = [_row_to_candle(row) for row in resp.json()]
+            time.sleep(PACE_BETWEEN_REQUESTS_SEC)
+            return candles
         except (httpx.TransportError, httpx.TimeoutException) as exc:
             if attempt == MAX_RETRIES - 1:
                 raise RuntimeError(
